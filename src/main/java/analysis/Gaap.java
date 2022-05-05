@@ -4,6 +4,7 @@ import analysis.geometry.AAP;
 import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
 import analysis.geometry.Pair;
+import analysis.math.Combination;
 import analysis.output.ReportGenerator;
 import com.google.gson.Gson;
 import com.menecats.polybool.Epsilon;
@@ -13,11 +14,11 @@ import net.sf.geographiclib.*;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
-import org.orekit.propagation.analytical.Ephemeris;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.utils.Utils;
+import satellite.tools.structures.Ephemeris;
 
 import java.awt.geom.Area;
 import java.awt.geom.Path2D;
@@ -156,28 +157,12 @@ public class Gaap {
                     euclideanCoordinates = polygon2pairList(resultingPolygon);
 
                     // Fixme use just polygon, etymologically "area" brings too much confusion
-//                    Area euclideanIntersection = new Area(computeEuclideanIntersection(FOVsToIntersect, referenceLat, referenceLon));
-//                    euclideanCoordinates = area2pairList(euclideanIntersection);
 
                     // When going back to the non euclidean plane we cannot use area2pairList since, naturally, the Area object cannot be filled in that plane
                     Path2D.Double nonEuclideanIntersection = toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = polygon2pairList(nonEuclideanIntersection);
 
-
-                    // DEBUUUGGGG
-
-//                    // -1 means proximity to the South Pole, 1 means proximity to the North Pole, 0 means no pole crossing
-//                    int poleProximity = checkPoleProximity(FOVsToIntersect, lambdaMax);
-//
-//                    if (poleProximity != 0) {
-////                        nonEuclideanCoordinates = computeStereographicIntersectionCoordinates(FOVsToIntersect, poleProximity * 90, 0);
-//                        nonEuclideanCoordinates = computeStereographicIntersectionCoordinates(FOVsToIntersect, FOVsToIntersect.get(0).getCenterLat(), FOVsToIntersect.get(0).getCenterLong());
-//                    } else {
-//                        nonEuclideanCoordinates = computeStereographicIntersectionCoordinates(FOVsToIntersect, FOVsToIntersect.get(0).getCenterLat(), FOVsToIntersect.get(0).getCenterLong()); //computeIntersectionCoordinates(FOVsToIntersect); //
-//                    }
-
                     surfaceInKm = computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
-
 
                 } else {
                     surfaceInKm = 0D;
@@ -212,23 +197,13 @@ public class Gaap {
 
         }
 
-        // DEBUG
-        if (DEBUG) {
-            System.out.println();
-            System.out.println();
-            statistics.forEach(System.out::println);
-        }
-
         saveAccessRegions(nonEuclideanAAPs); // FIXME DEBUG
         saveAccessRegions2(euclideanAAPs);
         saveSSPs(constellationSSPs);
 
 //        savePolygonMaps(polygonsOverTime);
 
-        reportGenerator.saveString()
-
-        Reports.saveStringList(statistics, OUTPUT_PATH + "stats" + CSV_EXTENSION);
-//        Reports.saveStringList(polygons, OUTPUT_PATH + "polygons" + CSV_EXTENSION);
+        reportGenerator.saveAsCSV(statistics, "stats");
 
     }
 
@@ -242,6 +217,7 @@ public class Gaap {
                             .collect(Collectors.toList()),"NEPolygons_" + nOfGw);
         }
 
+        // DEBUG
         reportGenerator.saveAsJSON(AAPs.stream()
                 .filter(AAP -> AAP.getDate() == 780000)
                 .collect(Collectors.toList()),"NEPolygonsDebug");
@@ -254,36 +230,20 @@ public class Gaap {
 
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
-            String json = gson.toJson(AAPs.stream().filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw).collect(Collectors.toList()));
-            Reports.saveString(json, OUTPUT_PATH + "EPolygons" + nOfGw + JSON_EXTENSION);
+            reportGenerator.saveAsJSON(AAPs.stream()
+                    .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
+                    .collect(Collectors.toList()),"EPolygons_" + nOfGw);
         }
 
         // DEBUG
-        String json = gson.toJson(AAPs.stream().filter(AAP ->
-                AAP.getDate() == 780000).collect(Collectors.toList())); //1320000
-        Reports.saveString(json, OUTPUT_PATH + "EPolygonsDebug" + JSON_EXTENSION);
+        reportGenerator.saveAsJSON(AAPs.stream()
+                .filter(AAP -> AAP.getDate() == 780000)
+                .collect(Collectors.toList()),"EPolygonsDebug");
 
     }
 
     private void saveSSPs(List<ConstellationSSPs> constellationSSPs) {
-        Gson gson = new Gson();
-        String json = gson.toJson(constellationSSPs);
-        Reports.saveString(json, OUTPUT_PATH + "ConstellationSSPs" + JSON_EXTENSION);
-    }
-
-    private void savePolygonMaps(Map<AbsoluteDate, Map<Integer, List<List<Pair>>>> maps) {
-
-        // Every number of gateways has a list of strings associated, said list contains the coordinates
-        // of every polygon
-
-        Gson gson = new Gson();
-
-        String json = gson.toJson(maps);
-
-        Reports.saveString(json, OUTPUT_PATH + "polygonsJson" + JSON_EXTENSION);
-
-        Map<Integer, List<String>> output = new LinkedHashMap<>(MAX_SUBSET_SIZE);
-
+        reportGenerator.saveAsJSON(constellationSSPs, "ConstellationSSPs");
     }
 
     private void updateProgressBar(double current, double total) {
@@ -383,7 +343,6 @@ public class Gaap {
      * @return boolean whether the intersection is empty or not
      **/
     private boolean checkDistances(List<Integer> assetsToCheck, List<FOV> FOVList, double lambdaMax) {
-
 
         // First we need to generate the combination list for the pair of assets that need checking
         Combination combination = new Combination();
