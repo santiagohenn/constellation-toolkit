@@ -1,5 +1,7 @@
 package analysis;
 
+import analysis.geometry.AAP;
+import analysis.geometry.FOV;
 import com.google.gson.Gson;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
@@ -8,7 +10,9 @@ import net.sf.geographiclib.*;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
+import org.orekit.propagation.analytical.Ephemeris;
 import org.orekit.time.AbsoluteDate;
+import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.utils.Utils;
 
