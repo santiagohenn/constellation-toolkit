@@ -1,7 +1,10 @@
 package analysis;
 
 import analysis.geometry.AAP;
+import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
+import analysis.geometry.Pair;
+import analysis.output.ReportGenerator;
 import com.google.gson.Gson;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
@@ -55,6 +58,8 @@ public class Gaap {
     private final List<ConstellationSSPs> constellationSSPs = new ArrayList<>();
 
     private Map<Double, Double> radii = new HashMap<>();
+
+    ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
     public static void main(String[] args) {
 
@@ -220,6 +225,8 @@ public class Gaap {
 
 //        savePolygonMaps(polygonsOverTime);
 
+        reportGenerator.saveString()
+
         Reports.saveStringList(statistics, OUTPUT_PATH + "stats" + CSV_EXTENSION);
 //        Reports.saveStringList(polygons, OUTPUT_PATH + "polygons" + CSV_EXTENSION);
 
@@ -227,18 +234,17 @@ public class Gaap {
 
     private void saveAccessRegions(List<AAP> AAPs) {
 
-        Gson gson = new Gson();
-
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
-            String json = gson.toJson(AAPs.stream().filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw).collect(Collectors.toList()));
-            Reports.saveString(json, OUTPUT_PATH + "NEPolygons_" + nOfGw + JSON_EXTENSION);
+
+            reportGenerator.saveAsJSON(AAPs.stream()
+                            .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
+                            .collect(Collectors.toList()),"NEPolygons_" + nOfGw);
         }
 
-        // DEBUG
-        String json = gson.toJson(AAPs.stream().filter(AAP ->
-                AAP.getDate() == 780000).collect(Collectors.toList())); //1320000
-        Reports.saveString(json, OUTPUT_PATH + "NEPolygonsDebug" + JSON_EXTENSION);
+        reportGenerator.saveAsJSON(AAPs.stream()
+                .filter(AAP -> AAP.getDate() == 780000)
+                .collect(Collectors.toList()),"NEPolygonsDebug");
 
     }
 
