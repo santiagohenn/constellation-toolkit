@@ -17,8 +17,8 @@ import org.orekit.data.DirectoryCrawler;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
-import satellite.tools.utils.Utils;
 import satellite.tools.structures.Ephemeris;
+import satellite.tools.utils.Utils;
 
 import java.awt.geom.Area;
 import java.awt.geom.Path2D;
@@ -26,6 +26,7 @@ import java.awt.geom.PathIterator;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,23 +37,20 @@ import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
  **/
 public class Gaap {
 
-    private final Properties properties = Utils.loadProperties("resources/gaap.properties");
-    private final String OREKIT_DATA_PATH = (String) properties.get("orekit_data_path");
     private final String RUN_DATE = Utils.unix2stamp(System.currentTimeMillis()).replace(":", "-");
-    private final boolean ROUNDING_MODE = Boolean.parseBoolean((String) properties.get("rounding_mode"));
+
+    private final Properties properties = Utils.loadProperties("gaap.properties");
+
     private final String START_DATE = (String) properties.get("start_date");
     private final String END_DATE = (String) properties.get("end_date");
     private final double TIME_STEP = Double.parseDouble((String) properties.get("time_step"));
     private final String OUTPUT_PATH = (String) properties.get("output_path");
-    private final String CSV_EXTENSION = ".csv";
-    private final String JSON_EXTENSION = ".json";
     private final String SATELLITES_FILE = (String) properties.get("satellites_file");
     private final boolean DEBUG = Boolean.parseBoolean((String) properties.get("debug_mode"));
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) properties.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) properties.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) properties.get("max_subset_size"));
     private final boolean USE_CONFORMAL_LATITUDE = Boolean.parseBoolean((String) properties.get("use_conformal_latitude"));
-    private final boolean SAVE_EMPTY_AREAS = Boolean.parseBoolean((String) properties.get("save_empty_areas"));
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
@@ -64,6 +62,15 @@ public class Gaap {
 
     public static void main(String[] args) {
 
+//        String resourceName = "gaap.properties";
+//        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+//        Properties props = new Properties();
+//        try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
+//            props.load(resourceStream);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+
         Gaap gaap = new Gaap();
         gaap.run();
 
@@ -71,11 +78,28 @@ public class Gaap {
 
     public Gaap() {
 
+//        this.properties = properties;
+        
+    }
+
+    private Properties loadProperties() {
+
+        String resourceName = "gaap.properties";
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        Properties props = new Properties();
+        try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
+            props.load(resourceStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return props;
+
     }
 
     public void run() {
 
-        loadOrekitData();
+        // loadOrekitData();
 
         double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
         log(RUN_DATE + " - Max. Lambda: " + lambdaMax);
@@ -263,7 +287,7 @@ public class Gaap {
 
     private void loadOrekitData() {
         // configure Orekit
-        var orekitData = new File(OREKIT_DATA_PATH);
+        var orekitData = new File((String) properties.get("orekit_data_path"));
         if (!orekitData.exists()) {
             System.err.format(Locale.US, "Failed to find %s folder%n",
                     orekitData.getAbsolutePath());
@@ -444,8 +468,8 @@ public class Gaap {
 
         /* Martinez-Rueda clipping algorithm - Java port by Menecats: https://github.com/Menecats/polybool-java
         * Paper: https://www.sciencedirect.com/science/article/pii/S0965997813000379
-            apparently, this one is significantly faster than other algorithms (maybe incl. JTS's one?)
-            * and can better handle special cases (like self-intersecting polygons). It's also supposed to be "simple".
+        * apparently, this one is significantly faster than other algorithms (maybe incl. JTS's one?)
+        * and can better handle special cases (like self-intersecting polygons). It's also supposed to be "simple".
         * */
 
         // Transform polygon1 to Polygol Polygon
@@ -952,15 +976,5 @@ public class Gaap {
         }
     }
 
-    /**
-     * Debug method TODO: REMOVE
-     **/
-    private void printCoordinates(Path2D.Double polygon) {
-        System.out.println("Coordinates in polygon : ");
-        polygon2pairList(polygon).forEach(pair -> System.out.println(pair.lat + "," + pair.lon));
-        Area areaPolygon = new Area(polygon);
-        System.out.println("Coordinates in area object : ");
-        area2pairList(areaPolygon).forEach(pair -> System.out.println(pair.lat + "," + pair.lon));
-    }
 
 }
