@@ -18,6 +18,7 @@ import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.structures.Ephemeris;
+import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
 import java.awt.geom.Area;
@@ -26,7 +27,6 @@ import java.awt.geom.PathIterator;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -62,15 +62,6 @@ public class Gaap {
 
     public static void main(String[] args) {
 
-//        String resourceName = "gaap.properties";
-//        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-//        Properties props = new Properties();
-//        try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
-//            props.load(resourceStream);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-
         Gaap gaap = new Gaap();
         gaap.run();
 
@@ -78,31 +69,21 @@ public class Gaap {
 
     public Gaap() {
 
-//        this.properties = properties;
-        
-    }
-
-    private Properties loadProperties() {
-
-        String resourceName = "gaap.properties";
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        Properties props = new Properties();
-        try(InputStream resourceStream = loader.getResourceAsStream(resourceName)) {
-            props.load(resourceStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return props;
 
     }
 
     public void run() {
 
-        // loadOrekitData();
+        // configure Orekit data context
+        var orekitData = new File("src/main/resources/orekit-data");
+        if (!orekitData.exists()) {
+            Log.fatal("Failed to find orekit-data folder " + orekitData.getAbsolutePath());
+            System.exit(1);
+        }
+        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+        manager.addProvider(new DirectoryCrawler(orekitData));
 
         double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
-        log(RUN_DATE + " - Max. Lambda: " + lambdaMax);
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -775,7 +756,7 @@ public class Gaap {
             double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
             double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
 
-            radii.put(xStereo, localRadius);
+            radii.put(yStereo, localRadius);
 
             if (segment == 0) {
                 euclideanPolygon.moveTo(xStereo, yStereo);
@@ -819,7 +800,7 @@ public class Gaap {
             double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
 
             double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-            if (USE_CONFORMAL_LATITUDE) radii.getOrDefault(xStereo, Utils.EARTH_RADIUS_AVG_KM);   // FIXME
+            if (USE_CONFORMAL_LATITUDE) localRadius = radii.getOrDefault(yStereo, Utils.EARTH_RADIUS_AVG_KM);   // FIXME
 
             double c = 2 * Math.atan2(rho, 2.0 * localRadius);
             double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
