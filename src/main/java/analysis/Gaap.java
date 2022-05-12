@@ -6,7 +6,6 @@ import analysis.geometry.FOV;
 import analysis.geometry.Pair;
 import analysis.math.Combination;
 import analysis.output.ReportGenerator;
-import com.google.gson.Gson;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
 import com.menecats.polybool.models.Polygon;
@@ -70,6 +69,7 @@ public class Gaap {
     public Gaap() {
 
 
+
     }
 
     public void run() {
@@ -83,7 +83,7 @@ public class Gaap {
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
 
-        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
+
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -95,6 +95,8 @@ public class Gaap {
 
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
+
+        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
         while (pointerDate.compareTo(endDate) <= 0) {
 
@@ -108,15 +110,6 @@ public class Gaap {
             List<Pair> SSPs = new ArrayList<>();
             nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
             constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
-
-            // DEBUG
-//            if (timeSinceStart == 1200000) {
-//                nonEuclideanFOVs.forEach(FOV -> {
-//                    List<Pair> euclideanCoordinates = polygon2pairList(toEuclideanPlane(FOV.getPolygon(), FOV.getReferenceLat(), FOV.getReferenceLon()));
-//                    System.out.println("Coordinates(0) for idx " + FOV.getSatId());
-//                    System.out.println(euclideanCoordinates.get(0));
-//                });
-//            }
 
             // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove once 1.1 is implemented
             Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
@@ -230,8 +223,6 @@ public class Gaap {
     }
 
     private void saveAccessRegions2(List<AAP> AAPs) {
-
-        Gson gson = new Gson();
 
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
@@ -697,18 +688,17 @@ public class Gaap {
 
             if (Double.isNaN(pointerLat) || Double.isNaN(pointerLon)) {
 
-                System.out.println("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
-                System.out.println("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
-                System.out.println("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
-                System.out.println("acos argument: " + deltaLonArgument);
-                System.out.println("acos: " + Math.acos(deltaLonArgument));
-                System.out.println("deltaLon = " + deltaLon);
-                System.out.println("pointerLon = " + pointerLon);
-                System.out.println("theta: " + theta);
-                System.out.println("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
+                Log.debug("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
+                Log.debug("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
+                Log.debug("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
+                Log.debug("acos argument: " + deltaLonArgument);
+                Log.debug("acos: " + Math.acos(deltaLonArgument));
+                Log.debug("deltaLon = " + deltaLon);
+                Log.debug("pointerLon = " + pointerLon);
+                Log.debug("theta: " + theta);
+                Log.debug("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
                         + " Math.cos(pointerLat_) = " + Math.cos(pointerLat_) + " Math.cos(centerLat_) = " + Math.cos(centerLat_)
                         + " Math.sin(pointerLat_) = " + Math.sin(pointerLat_));
-                System.out.println("Normalized coordinates: ");
 
             }
 
