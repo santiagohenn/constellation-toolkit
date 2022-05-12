@@ -1,5 +1,8 @@
 package constellation.tools;
 
+import com.menecats.polybool.Epsilon;
+import com.menecats.polybool.PolyBool;
+import com.menecats.polybool.models.Polygon;
 import constellation.tools.geometry.AAP;
 import constellation.tools.geometry.ConstellationSSPs;
 import constellation.tools.geometry.FOV;
@@ -7,9 +10,6 @@ import constellation.tools.math.Combination;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import constellation.tools.output.ReportGenerator;
-import com.menecats.polybool.Epsilon;
-import com.menecats.polybool.PolyBool;
-import com.menecats.polybool.models.Polygon;
 import net.sf.geographiclib.*;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
@@ -21,7 +21,6 @@ import satellite.tools.structures.Ephemeris;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Area;
 import java.awt.geom.Path2D;
 import java.io.File;
 import java.util.*;
@@ -366,43 +365,6 @@ public class Gaap {
         return 0;
     }
 
-    /**
-     * This method computes the intersection between all members of a provided polygon list, and returns a geodetic
-     * area value
-     *
-     * @param polygonsToIntersect A List of Path2D.Double objects depicting the polygons to intersect
-     * @return double the area of the intersection
-     **/
-    private double computeIntersectionArea(List<FOV> polygonsToIntersect) {
-
-        // Take the intersection and Inverse-Transform them to geographic coordinates
-        List<Pair> euclideanCoordinates = computeIntersectionCoordinates(polygonsToIntersect);
-
-        return computeNonEuclideanSurface(euclideanCoordinates);
-
-    }
-
-    /**
-     * This method computes the intersection between all members of a provided polygon list, and returns a list of
-     * geographic coordinates
-     *
-     * @param polygonsToIntersect A List of Path2D.Double objects depicting the polygons to intersect
-     * @return List of Geographic coordinates
-     **/
-    private List<Pair> computeIntersectionCoordinates(List<FOV> polygonsToIntersect) {
-
-        // Take the first polygon and transform it to stereographic
-        Area intersection = new Area(polygonsToIntersect.get(0).getPolygon());
-
-        for (FOV FOV : polygonsToIntersect) {
-            if (polygonsToIntersect.indexOf(FOV) == 0) continue;
-            intersection.intersect(new Area(FOV.getPolygon()));
-        }
-
-        // Take the intersection and Inverse-Transform them to geographic coordinates
-        return Transformations.area2pairList(intersection);
-
-    }
 
     private Path2D.Double intersectAndGetPolygon(Path2D.Double polygon1, Path2D.Double polygon2) {
 
