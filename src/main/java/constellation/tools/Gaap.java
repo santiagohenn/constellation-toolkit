@@ -418,29 +418,6 @@ public class Gaap {
     }
 
     /**
-     * This method takes the satellite list, propagates orbits to the specified date and computes each corresponding
-     * access area or FOV polygon for each one
-     *
-     * @param satellite the satellite for which the polygon is to be calculated
-     * @param date      a timestamp date String
-     * @return List
-     **/
-    @Deprecated
-    public Path2D.Double getStartingPolygonAt(Satellite satellite, String date) {
-
-        Simulation simulation = new Simulation();
-        AbsoluteDate absoluteDate = Utils.stamp2AD(date);
-
-        // Assume all satellites at the same height and take the first to get the needed size elements
-        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD);
-        simulation.setSatellite(satellite);
-        Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(absoluteDate);
-        return drawAAP(lambdaMax, ephemeris.getLatitude(),
-                ephemeris.getLongitude(), POLYGON_SEGMENTS);
-
-    }
-
-    /**
      * This method returns a polygon that approximates a circular access area centered at (centerLat, centerLon) with
      * a radius of lambdaMax and the passed number of segments
      *
