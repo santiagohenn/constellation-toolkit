@@ -6,6 +6,7 @@ import com.menecats.polybool.models.Polygon;
 import constellation.tools.geometry.AAP;
 import constellation.tools.geometry.ConstellationSSPs;
 import constellation.tools.geometry.FOV;
+import constellation.tools.geometry.Geo;
 import constellation.tools.math.Combination;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
@@ -117,7 +118,7 @@ public class Gaap {
 
                 List<FOV> FOVsToIntersect = new ArrayList<>();
                 combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
-                int poleProximity = checkPoleProximity(FOVsToIntersect, lambdaMax);
+                int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
 
                 double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                 double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
@@ -316,7 +317,7 @@ public class Gaap {
 
             int r1Idx = pairToCheck.get(0);
             int r2Idx = pairToCheck.get(1);
-            double distance = computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
+            double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
             if (distance >= 2 * lambdaMax) {
                 return false;
@@ -335,11 +336,11 @@ public class Gaap {
      * @return 0 if no FOV contains either the north or South Pole, 1 if some FOV contains the North Pole,
      * -1 if some FOV contains the South Pole
      **/
-    private int checkPoleProximity(List<FOV> regionsToIntersect, double lambdaMax) {
+    private int checkPoleInclusion(List<FOV> regionsToIntersect, double lambdaMax) {
 
         // check proximity poles
         for (FOV FOV : regionsToIntersect) {
-            int proximity = checkPoleProximity(FOV, lambdaMax);
+            int proximity = checkPoleInclusion(FOV, lambdaMax);
             if (proximity != 0) {
                 return proximity;
             }
@@ -355,11 +356,11 @@ public class Gaap {
      * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
      * -1 if it contains the South Pole
      **/
-    private int checkPoleProximity(FOV FOV, double lambdaMax) {
+    private int checkPoleInclusion(FOV FOV, double lambdaMax) {
 
-        if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
+        if (Geo.computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
             return 1;
-        } else if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
+        } else if (Geo.computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
             return -1;
         }
         return 0;
@@ -417,18 +418,7 @@ public class Gaap {
 
     }
 
-    /**
-     * Computes the angular distance over the euclidean plane given two pair of Region objects
-     *
-     * @param r1 the first FOV
-     * @param r2 the second FOV
-     * @return Double the computed angular distance in degrees
-     **/
-    public double computeGeodesic(FOV r1, FOV r2) {
-        GeodesicData g = Geodesic.WGS84.Inverse(r1.getReferenceLat(), r1.getReferenceLon(), r2.getReferenceLat(), r2.getReferenceLon(),
-                GeodesicMask.DISTANCE);
-        return g.a12;
-    }
+
 
     /**
      * This method takes the satellite list, propagates orbits to the specified date and computes each corresponding
@@ -453,20 +443,7 @@ public class Gaap {
 
     }
 
-    /**
-     * Computes the angular distance over the euclidean plane given two pair of Region objects
-     *
-     * @param lat1 the first FOV's latitude
-     * @param lon1 the first FOV's longitude
-     * @param lat2 the second FOV's latitude
-     * @param lon2 the second FOV's longitude
-     * @return a double value for the computed angular distance, in degrees
-     **/
-    public static double computeGeodesic(double lat1, double lon1, double lat2, double lon2) {
-        GeodesicData g = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2,
-                GeodesicMask.DISTANCE);
-        return g.a12;
-    }
+
 
     /**
      * This method computes the geodetic area of a Path2D.Double object
