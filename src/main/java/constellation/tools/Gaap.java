@@ -90,7 +90,7 @@ public class Gaap {
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
 
-        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
+        double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
         while (pointerDate.compareTo(endDate) <= 0) {
 
@@ -283,7 +283,7 @@ public class Gaap {
             simulation.setSatellite(satellite);
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
-            double lambdaMax = getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD); // NOTE MOVED LAMBDA OVER HERE
+            double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD); // NOTE MOVED LAMBDA OVER HERE
             Path2D.Double polygon = drawAAP(lambdaMax, ephemeris.getLatitude(),
                     ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
@@ -527,34 +527,6 @@ public class Gaap {
     }
 
 
-    /**
-     * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
-     * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
-     *
-     * @param semiMajorAxis       the orbit's semi major axis in meters
-     * @param visibilityThreshold the height above horizon visibility threshold in degrees
-     * @return Te maximum Earth Central Angle for the access area, in degrees
-     **/
-    public double getLambdaMax(double semiMajorAxis, double visibilityThreshold) {
-        return getLambdaMax(semiMajorAxis, 0, visibilityThreshold);
-    }
-
-    /**
-     * This method returns the maximum Lambda, which is defined as the maximum Earth Central Angle or
-     * half of a satellite's "cone FOV" over the surface of the Earth.
-     *
-     * @param semiMajorAxis       the orbit's semi major axis in meters
-     * @param eccentricity        the orbit's eccentricity
-     * @param visibilityThreshold the height above horizon visibility threshold in degrees
-     * @return Te maximum Earth Central Angle for the access area, in degrees
-     **/
-    public double getLambdaMax(double semiMajorAxis, double eccentricity, double visibilityThreshold) {
-
-        double hMax = ((1 + eccentricity) * semiMajorAxis) - Utils.EARTH_RADIUS_EQ_M;
-        double etaMax = Math.asin((Utils.EARTH_RADIUS_EQ_M * Math.cos(Math.toRadians(visibilityThreshold))) / (Utils.EARTH_RADIUS_EQ_M + hMax));
-        return 90 - visibilityThreshold - Math.toDegrees(etaMax);
-
-    }
 
 
 }

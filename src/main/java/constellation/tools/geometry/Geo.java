@@ -3,6 +3,7 @@ package constellation.tools.geometry;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import net.sf.geographiclib.*;
+import satellite.tools.utils.Utils;
 
 import java.awt.geom.Path2D;
 import java.util.List;
@@ -78,6 +79,36 @@ public class Geo {
 
         PolygonResult result = polygonArea.Compute();
         return Math.abs(result.area);
+
+    }
+
+
+    /**
+     * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
+     * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
+     *
+     * @param semiMajorAxis       the orbit's semi major axis in meters
+     * @param visibilityThreshold the height above horizon visibility threshold in degrees
+     * @return Te maximum Earth Central Angle for the access area, in degrees
+     **/
+    public static double getLambdaMax(double semiMajorAxis, double visibilityThreshold) {
+        return getLambdaMax(semiMajorAxis, 0, visibilityThreshold);
+    }
+
+    /**
+     * This method returns the maximum Lambda, which is defined as the maximum Earth Central Angle or
+     * half of a satellite's "cone FOV" over the surface of the Earth.
+     *
+     * @param semiMajorAxis       the orbit's semi major axis in meters
+     * @param eccentricity        the orbit's eccentricity
+     * @param visibilityThreshold the height above horizon visibility threshold in degrees
+     * @return Te maximum Earth Central Angle for the access area, in degrees
+     **/
+    public static double getLambdaMax(double semiMajorAxis, double eccentricity, double visibilityThreshold) {
+
+        double hMax = ((1 + eccentricity) * semiMajorAxis) - Utils.EARTH_RADIUS_EQ_M;
+        double etaMax = Math.asin((Utils.EARTH_RADIUS_EQ_M * Math.cos(Math.toRadians(visibilityThreshold))) / (Utils.EARTH_RADIUS_EQ_M + hMax));
+        return 90 - visibilityThreshold - Math.toDegrees(etaMax);
 
     }
 
