@@ -5,6 +5,7 @@ import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
 import analysis.math.Combination;
 import analysis.math.Pair;
+import analysis.math.Transformations;
 import analysis.output.ReportGenerator;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
@@ -22,7 +23,6 @@ import satellite.tools.utils.Utils;
 
 import java.awt.geom.Area;
 import java.awt.geom.Path2D;
-import java.awt.geom.PathIterator;
 import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -128,15 +128,15 @@ public class Gaap {
                     int fovIdx = combination.get(0);
                     FOV neFov = nonEuclideanFOVs.get(fovIdx);
                     surfaceInKm = neFov.getSurfaceKm2();
-                    nonEuclideanCoordinates = polygon2pairList(nonEuclideanFOVs.get(fovIdx).getPolygon());
-                    euclideanCoordinates = polygon2pairList(toEuclideanPlane(neFov.getPolygon(), referenceLat, referenceLon));
+                    nonEuclideanCoordinates = Transformations.polygon2pairList(nonEuclideanFOVs.get(fovIdx).getPolygon());
+                    euclideanCoordinates = Transformations.polygon2pairList(Transformations.toEuclideanPlane(neFov.getPolygon(), referenceLat, referenceLon));
 
                 } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {    // FIXME optimize transforming every starting AAP to stereographic
 
 //                  combination.forEach(regionIndex -> FOVsToIntersect.add(euclideanFOVs.get(regionIndex)));
 
                     List<Path2D.Double> polygonsToIntersect = new ArrayList<>();
-                    FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(toEuclideanPlane(FOV.getPolygon(), referenceLat, referenceLon)));
+                    FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygon(), referenceLat, referenceLon)));
 
                     Path2D.Double resultingPolygon =  new Path2D.Double(polygonsToIntersect.get(0));
 
@@ -147,13 +147,13 @@ public class Gaap {
 
                     }
 
-                    euclideanCoordinates = polygon2pairList(resultingPolygon);
+                    euclideanCoordinates = Transformations.polygon2pairList(resultingPolygon);
 
                     // Fixme use just polygon, etymologically "area" brings too much confusion
 
                     // When going back to the non euclidean plane we cannot use area2pairList since, naturally, the Area object cannot be filled in that plane
-                    Path2D.Double nonEuclideanIntersection = toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
-                    nonEuclideanCoordinates = polygon2pairList(nonEuclideanIntersection);
+                    Path2D.Double nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
+                    nonEuclideanCoordinates = Transformations.polygon2pairList(nonEuclideanIntersection);
 
                     surfaceInKm = computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
 
@@ -400,7 +400,7 @@ public class Gaap {
         }
 
         // Take the intersection and Inverse-Transform them to geographic coordinates
-        return area2pairList(intersection);
+        return Transformations.area2pairList(intersection);
 
     }
 
@@ -415,7 +415,7 @@ public class Gaap {
         // Transform polygon1 to Polygol Polygon
         List<List<double[]>> regions1 = new ArrayList<>();
         List<double[]> coordinates = new ArrayList<>();
-        List<Pair> pairList = polygon2pairList(polygon1);
+        List<Pair> pairList = Transformations.polygon2pairList(polygon1);
 
         pairList.forEach(pair -> coordinates.add(pair.getPoint()));
 
@@ -424,7 +424,7 @@ public class Gaap {
 
         List<List<double[]>> regions2 = new ArrayList<>();
         List<double[]> coordinates2 = new ArrayList<>();
-        List<Pair> pairList2 = polygon2pairList(polygon2);
+        List<Pair> pairList2 = Transformations.polygon2pairList(polygon2);
 
         pairList2.forEach(pair -> coordinates2.add(pair.getPoint()));
 
@@ -539,7 +539,7 @@ public class Gaap {
      * @return a double value of the computed area in meters squared
      **/
     public double computeNonEuclideanSurface(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(polygon2pairList(polygon));
+        return computeNonEuclideanSurface(Transformations.polygon2pairList(polygon));
     }
 
     /**
@@ -682,180 +682,6 @@ public class Gaap {
 
     }
 
-    public Path2D.Double toEuclideanPlane(Path2D.Double geographicPolygon, double referenceLat, double referenceLon) {
-
-        radii.clear();
-        Path2D.Double euclideanPolygon = new Path2D.Double();
-        PathIterator iterator = geographicPolygon.getPathIterator(null);
-
-        // Transform reference GCS coordinates to radians
-        final double referenceLatRads = Math.toRadians(referenceLat);
-        final double referenceLonRads = Math.toRadians(referenceLon);
-
-        int segment = 0;
-        while (!iterator.isDone()) {
-
-            final double[] coordinate = new double[2];
-            iterator.currentSegment(coordinate);
-
-            if (iterator.currentSegment(coordinate) == PathIterator.SEG_CLOSE) {
-                euclideanPolygon.closePath();
-                break;
-            }
-
-            double lat = Math.toRadians(coordinate[0]);
-            double lon = Math.toRadians(coordinate[1]);
-            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-            if (USE_CONFORMAL_LATITUDE) localRadius = computeLocalRadius(lat);
-
-            double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
-                    Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-            double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
-            double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-            radii.put(yStereo, localRadius);
-
-            if (segment == 0) {
-                euclideanPolygon.moveTo(xStereo, yStereo);
-            } else {
-                euclideanPolygon.lineTo(xStereo, yStereo);
-            }
-
-            segment++;
-            iterator.next();
-
-        }
-
-        return euclideanPolygon;
-
-    }
-
-    public Path2D.Double toNonEuclideanPlane(Path2D.Double euclideanPolygon, double referenceLat, double referenceLon) {
-
-        Path2D.Double GCSPolygon = new Path2D.Double();
-
-        // Transform to radians
-        double referenceLatRads = Math.toRadians(referenceLat);
-        double referenceLonRads = Math.toRadians(referenceLon);
-
-        PathIterator iterator = euclideanPolygon.getPathIterator(null);
-
-        int segment = 0;
-
-        while(!iterator.isDone()) {
-
-            final double[] coordinate = new double[2];
-            int segType = iterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            double xStereo = coordinate[0];
-            double yStereo = coordinate[1];
-
-            double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
-
-            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-            if (USE_CONFORMAL_LATITUDE) localRadius = radii.getOrDefault(yStereo, Utils.EARTH_RADIUS_AVG_KM);   // FIXME
-
-            double c = 2 * Math.atan2(rho, 2.0 * localRadius);
-            double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
-            double lon;
-
-            // For exactly the poles, avoid indeterminate points in the equations
-            if (referenceLat == 90.0) {
-                lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
-            } else if (referenceLat == -90.0) {
-                lon = referenceLonRads + Math.atan2(xStereo, yStereo);
-            } else {
-                lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
-                        - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
-            }
-
-            // Go back to degrees
-            lat = Math.toDegrees(lat);
-            lon = Math.toDegrees(lon);
-
-            while (lon < -180D) lon += 360;
-            while (lon > 180D) lon -= 360;
-
-            if (segment == 0) {
-                GCSPolygon.moveTo(lat, lon);
-            } else {
-                GCSPolygon.lineTo(lat, lon);
-            }
-
-            segment++;
-            iterator.next();
-
-        }
-
-        return GCSPolygon;
-
-    }
-
-    public synchronized List<Pair> polygon2pairList(Path2D.Double polygon) {
-
-        List<Pair> pairList = new ArrayList<>();
-
-        PathIterator pathIterator = polygon.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
-        }
-
-        return pairList;
-
-    }
-
-    public synchronized List<Pair> area2pairList(Area area) {
-
-        List<Pair> pairList = new ArrayList<>();
-
-        PathIterator pathIterator = area.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
-        }
-
-        return pairList;
-
-    }
-
-    private double computeLocalRadius(double lat) {
-
-        double latRads = Math.toRadians(lat);
-        double confLat = 2 * Math.atan(Math.tan(Math.PI / 4 + latRads / 2) * (Math.pow((1 - Math.E * Math.sin(latRads)) / (1 + Math.E * Math.sin(latRads)), (Math.E / 2)))) - Math.PI / 2;
-        return (Utils.EARTH_RADIUS_EQ_M * Math.cos(latRads)) / ((1 - Math.pow(Math.E, 2) * Math.pow(Math.sin(latRads), 2)) * Math.cos(confLat));
-
-    }
-
-    private double conformal2lat(double confLat) {
-
-        return confLat + (Math.pow(Math.E, 2) / 2 + 5 * Math.pow(Math.E, 4) / 24 + 13 * Math.pow(Math.E, 8) / 360) * Math.sin(2 * confLat)
-                + (7 * Math.pow(Math.E, 2) / 48 + 29 * Math.pow(Math.E, 4) / 240 + 811 * Math.pow(Math.E, 8) / 11520) * Math.sin(4 * confLat)
-                + (7 * Math.pow(Math.E, 6) / 120 + 81 * Math.pow(Math.E, 8) / 1120) * Math.sin(6 * confLat)
-                + (4279 * Math.pow(Math.E, 8) / 161280) * Math.sin(8 * confLat);
-
-    }
 
     /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
