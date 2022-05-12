@@ -1,4 +1,4 @@
-package analysis.geometry;
+package analysis.math;
 
 public class Pair {
 

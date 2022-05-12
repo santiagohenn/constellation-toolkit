@@ -1,5 +1,7 @@
 package analysis.geometry;
 
+import analysis.math.Pair;
+
 import java.util.ArrayList;
 import java.util.List;
 

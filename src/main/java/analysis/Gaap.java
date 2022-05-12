@@ -3,7 +3,7 @@ package analysis;
 import analysis.geometry.AAP;
 import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
-import analysis.geometry.Pair;
+import analysis.math.Pair;
 import analysis.math.Combination;
 import analysis.output.ReportGenerator;
 import com.menecats.polybool.Epsilon;

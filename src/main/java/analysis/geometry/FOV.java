@@ -1,5 +1,7 @@
 package analysis.geometry;
 
+import analysis.math.Pair;
+
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.util.ArrayList;
