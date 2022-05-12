@@ -3,8 +3,8 @@ package analysis;
 import analysis.geometry.AAP;
 import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
-import analysis.math.Pair;
 import analysis.math.Combination;
+import analysis.math.Pair;
 import analysis.output.ReportGenerator;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
@@ -24,8 +24,6 @@ import java.awt.geom.Area;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,8 +33,6 @@ import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
  * Geodetic Access Areas Propagator
  **/
 public class Gaap {
-
-    private final String RUN_DATE = Utils.unix2stamp(System.currentTimeMillis()).replace(":", "-");
 
     private final Properties properties = Utils.loadProperties("gaap.properties");
 
@@ -83,15 +79,14 @@ public class Gaap {
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
 
-
-
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate pointerDate = startDate;
         double scenarioDuration = endDate.durationFrom(startDate);
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
-        final List<List<Integer>> combinationsList = computeCombinationList(satelliteList.size());
+        Combination comb = new Combination(satelliteList.size(), MAX_SUBSET_SIZE);
+        final List<List<Integer>> combinationsList = comb.computeCombinations();
 
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
@@ -199,8 +194,6 @@ public class Gaap {
         saveAccessRegions2(euclideanAAPs);
         saveSSPs(constellationSSPs);
 
-//        savePolygonMaps(polygonsOverTime);
-
         reportGenerator.saveAsCSV(statistics, "stats");
 
     }
@@ -257,19 +250,6 @@ public class Gaap {
 
     }
 
-    private void loadOrekitData() {
-        // configure Orekit
-        var orekitData = new File((String) properties.get("orekit_data_path"));
-        if (!orekitData.exists()) {
-            System.err.format(Locale.US, "Failed to find %s folder%n",
-                    orekitData.getAbsolutePath());
-            System.exit(1);
-        }
-
-        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-        manager.addProvider(new DirectoryCrawler(orekitData));
-    }
-
     // FIXME REPLACE WITH POST-ANALYSIS
     private String stringifyResults(AbsoluteDate pointerDate, Map<Integer, Double> accumulatedAreas) {
 
@@ -283,18 +263,6 @@ public class Gaap {
 
         return sb.toString();
 
-    }
-
-    /**
-     * This method computes a List of Lists containing each and every possible combination of N in M where N is the
-     * maximum number of members in a subset (maximumSubsetSize) and M is the total amount of satellites
-     *
-     * @param sizeOfSet the amount of satellites in the constellation
-     * @return a List of Lists representing each subset of satellites combinations
-     **/
-    private List<List<Integer>> computeCombinationList(int sizeOfSet) {
-        Combination combination = new Combination(sizeOfSet, MAX_SUBSET_SIZE);
-        return combination.computeCombinations();
     }
 
     /**
@@ -916,35 +884,6 @@ public class Gaap {
         double etaMax = Math.asin((Utils.EARTH_RADIUS_EQ_M * Math.cos(Math.toRadians(visibilityThreshold))) / (Utils.EARTH_RADIUS_EQ_M + hMax));
         return 90 - visibilityThreshold - Math.toDegrees(etaMax);
 
-    }
-
-    /**
-     * This method saves a CSV containing the pair lat,long for a given coordinate List
-     *
-     * @param coordinates The list of coordinates that are to be saved
-     * @param path        The absolute path, including the desired file name
-     * @param addHeader   Whether to add or not the "lat,long" header
-     **/
-    public static void saveCoordinatesCSV(List<Pair> coordinates, String path, boolean addHeader) {
-        try (FileWriter writer = new FileWriter(path)) {
-            if (addHeader) {
-                writer.write("lat,long" + '\n');
-            }
-            for (Pair pair : coordinates) {
-                writer.write(pair.lat + "," + pair.lon + '\n');
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * This method outputs a debug message in the console
-     **/
-    public void log(String message) {
-        if (DEBUG) {
-            System.out.println(message);
-        }
     }
 
 
