@@ -468,32 +468,6 @@ public class Gaap {
         return g.a12;
     }
 
-
-    /**
-     * This method computes the angular distance over the euclidean plane given two pair of Ephemeris objects
-     *
-     * @param r1 the first ephemeris
-     * @param r2 the second ephemeris
-     * @return Double the computed angular distance in degrees
-     **/
-    @Deprecated
-    public double computeAngularDistance(FOV r1, FOV r2) {
-        return computeAngularDistance(r1.getReferenceLat(), r2.getReferenceLat(), r1.getReferenceLon(), r2.getReferenceLon());
-    }
-
-    /**
-     * Computes the angular distance over the euclidean plane given two pair of Ephemeris objects
-     *
-     * @param x1 first point for the first coordinate
-     * @param x2 first point for the second coordinate
-     * @param y1 second point for the first coordinate
-     * @param y2 second point for the second coordinate
-     * @return a double value representing the computed angular distance, in degrees
-     **/
-    public double computeAngularDistance(double x1, double x2, double y1, double y2) {
-        return Math.sqrt(Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2));
-    }
-
     /**
      * This method computes the geodetic area of a Path2D.Double object
      *
