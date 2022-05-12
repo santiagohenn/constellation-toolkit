@@ -1,4 +1,4 @@
-package analysis.math;
+package constellation.tools.math;
 
 public class Pair {
 

@@ -1,12 +1,12 @@
-package analysis;
+package constellation.tools;
 
-import analysis.geometry.AAP;
-import analysis.geometry.ConstellationSSPs;
-import analysis.geometry.FOV;
-import analysis.math.Combination;
-import analysis.math.Pair;
-import analysis.math.Transformations;
-import analysis.output.ReportGenerator;
+import constellation.tools.geometry.AAP;
+import constellation.tools.geometry.ConstellationSSPs;
+import constellation.tools.geometry.FOV;
+import constellation.tools.math.Combination;
+import constellation.tools.math.Pair;
+import constellation.tools.math.Transformations;
+import constellation.tools.output.ReportGenerator;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
 import com.menecats.polybool.models.Polygon;

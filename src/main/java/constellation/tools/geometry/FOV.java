@@ -1,6 +1,6 @@
-package analysis.geometry;
+package constellation.tools.geometry;
 
-import analysis.math.Pair;
+import constellation.tools.math.Pair;
 
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;

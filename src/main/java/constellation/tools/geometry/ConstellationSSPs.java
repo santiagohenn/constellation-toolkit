@@ -1,6 +1,6 @@
-package analysis.geometry;
+package constellation.tools.geometry;
 
-import analysis.math.Pair;
+import constellation.tools.math.Pair;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,4 +1,4 @@
-package analysis.math;
+package constellation.tools.math;
 
 import satellite.tools.utils.Utils;
 
