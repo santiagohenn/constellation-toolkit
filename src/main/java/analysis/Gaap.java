@@ -3,10 +3,9 @@ package analysis;
 import analysis.geometry.AAP;
 import analysis.geometry.ConstellationSSPs;
 import analysis.geometry.FOV;
-import analysis.geometry.Pair;
 import analysis.math.Combination;
+import analysis.math.Pair;
 import analysis.output.ReportGenerator;
-import com.google.gson.Gson;
 import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
 import com.menecats.polybool.models.Polygon;
@@ -17,15 +16,14 @@ import org.orekit.data.DirectoryCrawler;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
-import satellite.tools.utils.Utils;
 import satellite.tools.structures.Ephemeris;
+import satellite.tools.utils.Log;
+import satellite.tools.utils.Utils;
 
 import java.awt.geom.Area;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,23 +34,18 @@ import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
  **/
 public class Gaap {
 
-    private final Properties properties = Utils.loadProperties("resources/gaap.properties");
-    private final String OREKIT_DATA_PATH = (String) properties.get("orekit_data_path");
-    private final String RUN_DATE = Utils.unix2stamp(System.currentTimeMillis()).replace(":", "-");
-    private final boolean ROUNDING_MODE = Boolean.parseBoolean((String) properties.get("rounding_mode"));
+    private final Properties properties = Utils.loadProperties("gaap.properties");
+
     private final String START_DATE = (String) properties.get("start_date");
     private final String END_DATE = (String) properties.get("end_date");
     private final double TIME_STEP = Double.parseDouble((String) properties.get("time_step"));
     private final String OUTPUT_PATH = (String) properties.get("output_path");
-    private final String CSV_EXTENSION = ".csv";
-    private final String JSON_EXTENSION = ".json";
     private final String SATELLITES_FILE = (String) properties.get("satellites_file");
     private final boolean DEBUG = Boolean.parseBoolean((String) properties.get("debug_mode"));
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) properties.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) properties.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) properties.get("max_subset_size"));
     private final boolean USE_CONFORMAL_LATITUDE = Boolean.parseBoolean((String) properties.get("use_conformal_latitude"));
-    private final boolean SAVE_EMPTY_AREAS = Boolean.parseBoolean((String) properties.get("save_empty_areas"));
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
@@ -71,14 +64,20 @@ public class Gaap {
 
     public Gaap() {
 
+
+
     }
 
     public void run() {
 
-        loadOrekitData();
-
-        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
-        log(RUN_DATE + " - Max. Lambda: " + lambdaMax);
+        // configure Orekit data context
+        var orekitData = new File("src/main/resources/orekit-data");
+        if (!orekitData.exists()) {
+            Log.fatal("Failed to find orekit-data folder " + orekitData.getAbsolutePath());
+            System.exit(1);
+        }
+        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+        manager.addProvider(new DirectoryCrawler(orekitData));
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -86,10 +85,13 @@ public class Gaap {
         double scenarioDuration = endDate.durationFrom(startDate);
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
-        final List<List<Integer>> combinationsList = computeCombinationList(satelliteList.size());
+        Combination comb = new Combination(satelliteList.size(), MAX_SUBSET_SIZE);
+        final List<List<Integer>> combinationsList = comb.computeCombinations();
 
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
+
+        double lambdaMax = getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
         while (pointerDate.compareTo(endDate) <= 0) {
 
@@ -103,15 +105,6 @@ public class Gaap {
             List<Pair> SSPs = new ArrayList<>();
             nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
             constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
-
-            // DEBUG
-//            if (timeSinceStart == 1200000) {
-//                nonEuclideanFOVs.forEach(FOV -> {
-//                    List<Pair> euclideanCoordinates = polygon2pairList(toEuclideanPlane(FOV.getPolygon(), FOV.getReferenceLat(), FOV.getReferenceLon()));
-//                    System.out.println("Coordinates(0) for idx " + FOV.getSatId());
-//                    System.out.println(euclideanCoordinates.get(0));
-//                });
-//            }
 
             // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove once 1.1 is implemented
             Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
@@ -201,8 +194,6 @@ public class Gaap {
         saveAccessRegions2(euclideanAAPs);
         saveSSPs(constellationSSPs);
 
-//        savePolygonMaps(polygonsOverTime);
-
         reportGenerator.saveAsCSV(statistics, "stats");
 
     }
@@ -225,8 +216,6 @@ public class Gaap {
     }
 
     private void saveAccessRegions2(List<AAP> AAPs) {
-
-        Gson gson = new Gson();
 
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
@@ -261,19 +250,6 @@ public class Gaap {
 
     }
 
-    private void loadOrekitData() {
-        // configure Orekit
-        var orekitData = new File(OREKIT_DATA_PATH);
-        if (!orekitData.exists()) {
-            System.err.format(Locale.US, "Failed to find %s folder%n",
-                    orekitData.getAbsolutePath());
-            System.exit(1);
-        }
-
-        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-        manager.addProvider(new DirectoryCrawler(orekitData));
-    }
-
     // FIXME REPLACE WITH POST-ANALYSIS
     private String stringifyResults(AbsoluteDate pointerDate, Map<Integer, Double> accumulatedAreas) {
 
@@ -287,18 +263,6 @@ public class Gaap {
 
         return sb.toString();
 
-    }
-
-    /**
-     * This method computes a List of Lists containing each and every possible combination of N in M where N is the
-     * maximum number of members in a subset (maximumSubsetSize) and M is the total amount of satellites
-     *
-     * @param sizeOfSet the amount of satellites in the constellation
-     * @return a List of Lists representing each subset of satellites combinations
-     **/
-    private List<List<Integer>> computeCombinationList(int sizeOfSet) {
-        Combination combination = new Combination(sizeOfSet, MAX_SUBSET_SIZE);
-        return combination.computeCombinations();
     }
 
     /**
@@ -444,8 +408,8 @@ public class Gaap {
 
         /* Martinez-Rueda clipping algorithm - Java port by Menecats: https://github.com/Menecats/polybool-java
         * Paper: https://www.sciencedirect.com/science/article/pii/S0965997813000379
-            apparently, this one is significantly faster than other algorithms (maybe incl. JTS's one?)
-            * and can better handle special cases (like self-intersecting polygons). It's also supposed to be "simple".
+        * apparently, this one is significantly faster than other algorithms (maybe incl. JTS's one?)
+        * and can better handle special cases (like self-intersecting polygons). It's also supposed to be "simple".
         * */
 
         // Transform polygon1 to Polygol Polygon
@@ -692,18 +656,17 @@ public class Gaap {
 
             if (Double.isNaN(pointerLat) || Double.isNaN(pointerLon)) {
 
-                System.out.println("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
-                System.out.println("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
-                System.out.println("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
-                System.out.println("acos argument: " + deltaLonArgument);
-                System.out.println("acos: " + Math.acos(deltaLonArgument));
-                System.out.println("deltaLon = " + deltaLon);
-                System.out.println("pointerLon = " + pointerLon);
-                System.out.println("theta: " + theta);
-                System.out.println("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
+                Log.debug("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
+                Log.debug("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
+                Log.debug("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
+                Log.debug("acos argument: " + deltaLonArgument);
+                Log.debug("acos: " + Math.acos(deltaLonArgument));
+                Log.debug("deltaLon = " + deltaLon);
+                Log.debug("pointerLon = " + pointerLon);
+                Log.debug("theta: " + theta);
+                Log.debug("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
                         + " Math.cos(pointerLat_) = " + Math.cos(pointerLat_) + " Math.cos(centerLat_) = " + Math.cos(centerLat_)
                         + " Math.sin(pointerLat_) = " + Math.sin(pointerLat_));
-                System.out.println("Normalized coordinates: ");
 
             }
 
@@ -751,7 +714,7 @@ public class Gaap {
             double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
             double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
 
-            radii.put(xStereo, localRadius);
+            radii.put(yStereo, localRadius);
 
             if (segment == 0) {
                 euclideanPolygon.moveTo(xStereo, yStereo);
@@ -795,7 +758,7 @@ public class Gaap {
             double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
 
             double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-            if (USE_CONFORMAL_LATITUDE) radii.getOrDefault(xStereo, Utils.EARTH_RADIUS_AVG_KM);   // FIXME
+            if (USE_CONFORMAL_LATITUDE) localRadius = radii.getOrDefault(yStereo, Utils.EARTH_RADIUS_AVG_KM);   // FIXME
 
             double c = 2 * Math.atan2(rho, 2.0 * localRadius);
             double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
@@ -923,44 +886,5 @@ public class Gaap {
 
     }
 
-    /**
-     * This method saves a CSV containing the pair lat,long for a given coordinate List
-     *
-     * @param coordinates The list of coordinates that are to be saved
-     * @param path        The absolute path, including the desired file name
-     * @param addHeader   Whether to add or not the "lat,long" header
-     **/
-    public static void saveCoordinatesCSV(List<Pair> coordinates, String path, boolean addHeader) {
-        try (FileWriter writer = new FileWriter(path)) {
-            if (addHeader) {
-                writer.write("lat,long" + '\n');
-            }
-            for (Pair pair : coordinates) {
-                writer.write(pair.lat + "," + pair.lon + '\n');
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * This method outputs a debug message in the console
-     **/
-    public void log(String message) {
-        if (DEBUG) {
-            System.out.println(message);
-        }
-    }
-
-    /**
-     * Debug method TODO: REMOVE
-     **/
-    private void printCoordinates(Path2D.Double polygon) {
-        System.out.println("Coordinates in polygon : ");
-        polygon2pairList(polygon).forEach(pair -> System.out.println(pair.lat + "," + pair.lon));
-        Area areaPolygon = new Area(polygon);
-        System.out.println("Coordinates in area object : ");
-        area2pairList(areaPolygon).forEach(pair -> System.out.println(pair.lat + "," + pair.lon));
-    }
 
 }
