@@ -52,17 +52,6 @@ public class Geo {
     }
 
     /**
-     * This method computes the geodetic area of a Path2D.Double object
-     *
-     * @param polygon The Path2D.Double Object depicting the polygon
-     * @return a double value of the computed area in kilometers squared
-     **/
-    @Deprecated
-    public static double computeGeodeticAreaKm(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(polygon) / 1E6;
-    }
-
-    /**
      * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
      * vertices. This method uses the net.sf.geographiclib library.
      *
@@ -81,7 +70,6 @@ public class Geo {
         return Math.abs(result.area);
 
     }
-
 
     /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as

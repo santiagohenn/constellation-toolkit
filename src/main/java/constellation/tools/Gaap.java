@@ -44,13 +44,10 @@ public class Gaap {
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) properties.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) properties.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) properties.get("max_subset_size"));
-    private final boolean USE_CONFORMAL_LATITUDE = Boolean.parseBoolean((String) properties.get("use_conformal_latitude"));
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
     private final List<ConstellationSSPs> constellationSSPs = new ArrayList<>();
-
-    private Map<Double, Double> radii = new HashMap<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
@@ -132,8 +129,6 @@ public class Gaap {
 
                 } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {    // FIXME optimize transforming every starting AAP to stereographic
 
-//                  combination.forEach(regionIndex -> FOVsToIntersect.add(euclideanFOVs.get(regionIndex)));
-
                     List<Path2D.Double> polygonsToIntersect = new ArrayList<>();
                     FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygon(), referenceLat, referenceLon)));
 
@@ -158,7 +153,6 @@ public class Gaap {
 
                 } else {
                     surfaceInKm = 0D;
-//                    if (SAVE_EMPTY_AREAS) accessAreas.put(combination.toString(), 0D);
                 }
 
                 // Area accumulator and store // 1.1 FIXME Replace with post-surface filter and accumulator
@@ -365,14 +359,13 @@ public class Gaap {
         return 0;
     }
 
-
+    /**
+     * Checks whether the provided FOV contains any of Earth's poles
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
     private Path2D.Double intersectAndGetPolygon(Path2D.Double polygon1, Path2D.Double polygon2) {
-
-        /* Martinez-Rueda clipping algorithm - Java port by Menecats: https://github.com/Menecats/polybool-java
-        * Paper: https://www.sciencedirect.com/science/article/pii/S0965997813000379
-        * apparently, this one is significantly faster than other algorithms (maybe incl. JTS's one?)
-        * and can better handle special cases (like self-intersecting polygons). It's also supposed to be "simple".
-        * */
 
         // Transform polygon1 to Polygol Polygon
         List<List<double[]>> regions1 = new ArrayList<>();
