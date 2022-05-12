@@ -11,7 +11,6 @@ import constellation.tools.math.Combination;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import constellation.tools.output.ReportGenerator;
-import net.sf.geographiclib.*;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
@@ -155,7 +154,7 @@ public class Gaap {
                     Path2D.Double nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = Transformations.polygon2pairList(nonEuclideanIntersection);
 
-                    surfaceInKm = computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
+                    surfaceInKm = Geo.computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
 
                 } else {
                     surfaceInKm = 0D;
@@ -289,7 +288,7 @@ public class Gaap {
                     ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), polygon);
-            FOV.setSurface(computeNonEuclideanSurface(polygon));
+            FOV.setSurface(Geo.computeNonEuclideanSurface(polygon));
             FOVList.add(FOV);
         }
 
@@ -418,8 +417,6 @@ public class Gaap {
 
     }
 
-
-
     /**
      * This method takes the satellite list, propagates orbits to the specified date and computes each corresponding
      * access area or FOV polygon for each one
@@ -440,49 +437,6 @@ public class Gaap {
         Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(absoluteDate);
         return drawAAP(lambdaMax, ephemeris.getLatitude(),
                 ephemeris.getLongitude(), POLYGON_SEGMENTS);
-
-    }
-
-
-
-    /**
-     * This method computes the geodetic area of a Path2D.Double object
-     *
-     * @param polygon The Path2D.Double Object depicting the polygon
-     * @return a double value of the computed area in meters squared
-     **/
-    public double computeNonEuclideanSurface(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(Transformations.polygon2pairList(polygon));
-    }
-
-    /**
-     * This method computes the geodetic area of a Path2D.Double object
-     *
-     * @param polygon The Path2D.Double Object depicting the polygon
-     * @return a double value of the computed area in kilometers squared
-     **/
-    @Deprecated
-    public double computeGeodeticAreaKm(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(polygon) / 1E6;
-    }
-
-    /**
-     * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
-     * vertices. This method uses the net.sf.geographiclib library.
-     *
-     * @param pairList A List containing the coordinates of the polygon
-     * @return Double the computed area in meters squared
-     **/
-    public double computeNonEuclideanSurface(List<Pair> pairList) {
-
-        PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
-
-        for (Pair pair : pairList) {
-            polygonArea.AddPoint(pair.lat, pair.lon);
-        }
-
-        PolygonResult result = polygonArea.Compute();
-        return Math.abs(result.area);
 
     }
 
