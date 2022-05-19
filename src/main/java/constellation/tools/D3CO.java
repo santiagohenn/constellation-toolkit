@@ -29,21 +29,30 @@ import java.util.stream.Collectors;
 import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
 
 /**
- * Geodetic Access Areas Propagator
+ * Dynamic Constellation Coverage Computer (D3CO)
  **/
-public class Gaap {
+public class D3CO {
 
-    private final Properties properties = Utils.loadProperties("config.properties");
+    private static final Properties prop = Utils.loadProperties("config.properties");
+    private static final String orekitPath = (String) prop.get("orekit_data_path");
+    private static final File orekitFile = Utils.loadFile(orekitPath);
 
-    private final String START_DATE = (String) properties.get("start_date");
-    private final String END_DATE = (String) properties.get("end_date");
-    private final double TIME_STEP = Double.parseDouble((String) properties.get("time_step"));
-    private final String OUTPUT_PATH = (String) properties.get("output_path");
-    private final String SATELLITES_FILE = (String) properties.get("satellites_file");
-    private final boolean DEBUG = Boolean.parseBoolean((String) properties.get("debug_mode"));
-    private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) properties.get("visibility_threshold"));
-    private final double POLYGON_SEGMENTS = Double.parseDouble((String) properties.get("polygon_segments"));
-    private final int MAX_SUBSET_SIZE = Integer.parseInt((String) properties.get("max_subset_size"));
+    private static final DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+
+    static {
+        manager.addProvider(new DirectoryCrawler(orekitFile));
+        Log.debug("Manager loaded");
+    }
+
+    private final String START_DATE = (String) prop.get("start_date");
+    private final String END_DATE = (String) prop.get("end_date");
+    private final double TIME_STEP = Double.parseDouble((String) prop.get("time_step"));
+    private final String OUTPUT_PATH = (String) prop.get("output_path");
+    private final String SATELLITES_FILE = (String) prop.get("satellites_file");
+    private final boolean DEBUG = Boolean.parseBoolean((String) prop.get("debug_mode"));
+    private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
+    private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
+    private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
@@ -51,29 +60,13 @@ public class Gaap {
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
-    public static void main(String[] args) {
-
-        Gaap gaap = new Gaap();
-        gaap.run();
-
-    }
-
-    public Gaap() {
+    public D3CO() {
 
 
 
     }
 
     public void run() {
-
-        // configure Orekit data context
-        var orekitData = new File("src/main/resources/orekit-data");
-        if (!orekitData.exists()) {
-            Log.fatal("Failed to find orekit-data folder " + orekitData.getAbsolutePath());
-            System.exit(1);
-        }
-        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-        manager.addProvider(new DirectoryCrawler(orekitData));
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
