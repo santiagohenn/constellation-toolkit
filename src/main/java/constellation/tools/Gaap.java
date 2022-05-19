@@ -33,7 +33,7 @@ import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
  **/
 public class Gaap {
 
-    private final Properties properties = Utils.loadProperties("gaap.properties");
+    private final Properties properties = Utils.loadProperties("config.properties");
 
     private final String START_DATE = (String) properties.get("start_date");
     private final String END_DATE = (String) properties.get("end_date");
