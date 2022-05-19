@@ -60,9 +60,10 @@ public class D3CO {
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
+    /**
+     * Default constructor
+     * **/
     public D3CO() {
-
-
 
     }
 
@@ -176,44 +177,28 @@ public class D3CO {
 
         }
 
-        saveAccessRegions(nonEuclideanAAPs); // FIXME DEBUG
-        saveAccessRegions2(euclideanAAPs);
+        saveAccessRegions(nonEuclideanAAPs, "NEPolygons_"); // FIXME DEBUG
+        saveAccessRegions(euclideanAAPs, "EPolygons_");
         saveSSPs(constellationSSPs);
 
         reportGenerator.saveAsCSV(statistics, "stats");
 
     }
 
-    private void saveAccessRegions(List<AAP> AAPs) {
+    private void saveAccessRegions(List<AAP> AAPs, String fileName) {
 
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
 
             reportGenerator.saveAsJSON(AAPs.stream()
                             .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
-                            .collect(Collectors.toList()),"NEPolygons_" + nOfGw);
+                            .collect(Collectors.toList()),fileName + "_" + nOfGw);
         }
 
         // DEBUG
         reportGenerator.saveAsJSON(AAPs.stream()
                 .filter(AAP -> AAP.getDate() == 780000)
-                .collect(Collectors.toList()),"NEPolygonsDebug");
-
-    }
-
-    private void saveAccessRegions2(List<AAP> AAPs) {
-
-        for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
-            int finalNOfGw = nOfGw;
-            reportGenerator.saveAsJSON(AAPs.stream()
-                    .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
-                    .collect(Collectors.toList()),"EPolygons_" + nOfGw);
-        }
-
-        // DEBUG
-        reportGenerator.saveAsJSON(AAPs.stream()
-                .filter(AAP -> AAP.getDate() == 780000)
-                .collect(Collectors.toList()),"EPolygonsDebug");
+                .collect(Collectors.toList()),fileName + "debug");
 
     }
 
@@ -259,7 +244,7 @@ public class D3CO {
      * @param date          an AbsoluteDate object
      * @return a List of Regions
      **/
-    public List<FOV> computeStartingFOVsAt(List<Satellite> satelliteList, AbsoluteDate date) {
+    private List<FOV> computeStartingFOVsAt(List<Satellite> satelliteList, AbsoluteDate date) {
 
         Simulation simulation = new Simulation();
         List<FOV> FOVList = new ArrayList<>();
@@ -326,7 +311,7 @@ public class D3CO {
 
         // check proximity poles
         for (FOV FOV : regionsToIntersect) {
-            int proximity = checkPoleInclusion(FOV, lambdaMax);
+            int proximity = Geo.checkPoleInclusion(FOV, lambdaMax);
             if (proximity != 0) {
                 return proximity;
             }
@@ -334,23 +319,6 @@ public class D3CO {
         return 0;
     }
 
-    /**
-     * Checks whether the provided FOV contains any of Earth's poles
-     *
-     * @param FOV       A List of Regions to check
-     * @param lambdaMax The Maximum Earth Central Angle of the regions to check
-     * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
-     * -1 if it contains the South Pole
-     **/
-    private int checkPoleInclusion(FOV FOV, double lambdaMax) {
-
-        if (Geo.computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
-            return 1;
-        } else if (Geo.computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
-            return -1;
-        }
-        return 0;
-    }
 
     /**
      * Checks whether the provided FOV contains any of Earth's poles
@@ -511,8 +479,5 @@ public class D3CO {
         return euclideanPolygon;
 
     }
-
-
-
 
 }

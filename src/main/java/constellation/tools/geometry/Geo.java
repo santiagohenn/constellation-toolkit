@@ -14,6 +14,24 @@ import java.util.List;
 public class Geo {
 
     /**
+     * Checks whether the provided FOV contains any of Earth's poles
+     *
+     * @param FOV       A List of Regions to check
+     * @param lambdaMax The Maximum Earth Central Angle of the regions to check
+     * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
+     * -1 if it contains the South Pole
+     **/
+    public static int checkPoleInclusion(FOV FOV, double lambdaMax) {
+
+        if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
+            return 1;
+        } else if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
+            return -1;
+        }
+        return 0;
+    }
+
+    /**
      * Computes the angular distance over the euclidean plane given two pair of Region objects. Said objects
      * must have reference coordinates, distance will be computed among those coordinates
      *
