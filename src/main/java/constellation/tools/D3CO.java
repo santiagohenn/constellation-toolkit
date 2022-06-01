@@ -65,6 +65,39 @@ public class D3CO {
      * **/
     public D3CO() {
 
+
+    }
+
+    public void runSSPs() {
+
+        AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
+        AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
+        AbsoluteDate pointerDate = startDate;
+        double scenarioDuration = endDate.durationFrom(startDate);
+
+        while (pointerDate.compareTo(endDate) <= 0) {
+
+            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+            updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
+
+            // Obtain the starting non-euclidean FOVs and their surface value
+            List<FOV> nonEuclideanFOVs = computeStartingFOVsAt(satelliteList, pointerDate);
+
+            // Store the SSPs (per Guido's request)
+            List<Pair> SSPs = new ArrayList<>();
+
+            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
+            constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
+
+            // Advance to the next time step
+            pointerDate = pointerDate.shiftedBy(TIME_STEP);
+
+        }
+
+        saveSSPs(constellationSSPs);
+
+        reportGenerator.saveAsCSV(statistics, "stats");
+
     }
 
     public void run() {
@@ -91,12 +124,7 @@ public class D3CO {
             // Obtain the starting non-euclidean FOVs and their surface value
             List<FOV> nonEuclideanFOVs = computeStartingFOVsAt(satelliteList, pointerDate);
 
-            // Store the SSPs (per Guido's request)
-            List<Pair> SSPs = new ArrayList<>();
-            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
-            constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
-
-            // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove once 1.1 is implemented
+            // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
             Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
 
             double surfaceInKm = 0D;
@@ -179,7 +207,6 @@ public class D3CO {
 
         saveAccessRegions(nonEuclideanAAPs, "NEPolygons_"); // FIXME DEBUG
         saveAccessRegions(euclideanAAPs, "EPolygons_");
-        saveSSPs(constellationSSPs);
 
         reportGenerator.saveAsCSV(statistics, "stats");
 
@@ -249,15 +276,12 @@ public class D3CO {
         Simulation simulation = new Simulation();
         List<FOV> FOVList = new ArrayList<>();
 
-        // Assume all satellites at the same height and take the first to get the needed size elements // FIXME In process, do not assume every satellite at the same height
-
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
-            double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD); // NOTE MOVED LAMBDA OVER HERE
-            Path2D.Double polygon = drawAAP(lambdaMax, ephemeris.getLatitude(),
-                    ephemeris.getLongitude(), POLYGON_SEGMENTS);
+            double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
+            Path2D.Double polygon = drawAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), polygon);
             FOV.setSurface(Geo.computeNonEuclideanSurface(polygon));

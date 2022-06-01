@@ -1,27 +1,4 @@
-[FATAL] 2022-05-19 14:55:37.271 [main] Log - Failed to find directoryC:\Projects\satellite-tools\src\main\resources\orekit-data
-[FATAL] 2022-05-19 14:56:22.278 [main] Log - Failed to find directoryC:\Projects\satellite-tools\src\main\resources\orekit-data
-[FATAL] 2022-05-19 15:05:42.068 [main] Log - Failed to find directory C:\Projects\satellite-tools\src\main\resources\orekit-data
-[DEBUG] 2022-05-19 15:20:34.584 [main] Log - Manager loaded
-[DEBUG] 2022-05-19 15:20:35.457 [main] Log - Orekit data path: C:/Projects/orekit-data
-[DEBUG] 2022-05-19 15:20:35.457 [main] Log - Start date: 2022-01-01T20:20:00.000
-[DEBUG] 2022-05-19 15:20:35.458 [main] Log - End date: 2022-01-02T20:20:00.000
-[DEBUG] 2022-05-19 15:20:35.459 [main] Log - Time step: 60
-[DEBUG] 2022-05-19 15:20:35.459 [main] Log - Vis. TH: 5
-[DEBUG] 2022-05-19 15:20:35.459 [main] Log - th_detection: 0.001
-[FATAL] 2022-05-19 15:31:53.074 [main] Log - Failed to find directory C:\Projects\constellation-toolkit\orekit-data
-[FATAL] 2022-05-19 15:32:16.578 [main] Log - Failed to find directory C:\Projects\constellation-toolkit\orekit-data
-[DEBUG] 2022-05-19 15:33:10.284 [main] Log - Manager loaded
-[DEBUG] 2022-05-19 15:37:17.347 [main] Log - Manager loaded
-[DEBUG] 2022-05-19 15:37:18.087 [main] Log - Orekit data path: C:/Projects/orekit-data
-[DEBUG] 2022-05-19 15:37:18.088 [main] Log - Start date: 2020-01-01T20:20:00.000
-[DEBUG] 2022-05-19 15:37:18.089 [main] Log - End date: 2020-01-01T20:45:00.000
-[DEBUG] 2022-05-19 15:37:18.090 [main] Log - Time step: 60
-[DEBUG] 2022-05-19 15:37:18.091 [main] Log - Vis. TH: 5
-[DEBUG] 2022-05-19 15:37:18.091 [main] Log - th_detection: 0.001
-[DEBUG] 2022-05-19 16:37:55.646 [main] Log - Manager loaded
-[DEBUG] 2022-05-19 16:37:57.057 [main] Log - Orekit data path: C:/Projects/orekit-data
-[DEBUG] 2022-05-19 16:37:57.058 [main] Log - Start date: 2020-01-01T20:20:00.000
-[DEBUG] 2022-05-19 16:37:57.059 [main] Log - End date: 2020-01-01T20:45:00.000
-[DEBUG] 2022-05-19 16:37:57.060 [main] Log - Time step: 60
-[DEBUG] 2022-05-19 16:37:57.060 [main] Log - Vis. TH: 5
-[DEBUG] 2022-05-19 16:37:57.062 [main] Log - th_detection: 0.001
+[DEBUG] 2022-05-31 16:09:25.244 [main] Log - Manager loaded
+[DEBUG] 2022-05-31 16:09:25.366 [main] Log - Manager loaded
+[DEBUG] 2022-05-31 16:10:05.024 [main] Log - Manager loaded
+[DEBUG] 2022-05-31 16:10:05.145 [main] Log - Manager loaded
