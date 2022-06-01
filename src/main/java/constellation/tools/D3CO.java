@@ -137,8 +137,8 @@ public class D3CO {
 
                 List<FOV> FOVsToIntersect = new ArrayList<>();
                 combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
-                int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
 
+                int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
                 double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                 double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
@@ -352,7 +352,7 @@ public class D3CO {
 
 
     /**
-     * Checks whether the provided FOV contains any of Earth's poles
+     * Checks whether the provided FOV contains any of Earth's poles // TODO fix this comment
      *
      * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
      * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
@@ -399,6 +399,33 @@ public class D3CO {
         }
 
         return intersectionPolygon;
+
+    }
+
+    /**
+     * ... Polybool intersection from list of double[]
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    private List<double[]> intersectAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
+
+        List<List<double[]>> regions1 = new ArrayList<>();
+        regions1.add(polygonA);
+
+        List<List<double[]>> regions2 = new ArrayList<>();
+        regions1.add(polygonB);
+
+        Polygon polyA = new Polygon(regions1);
+        Polygon polyB = new Polygon(regions2);
+        Polygon intersection = new Polygon();
+
+        if (polyA.getRegions().get(0).size() >= 3 && polyB.getRegions().get(0).size() >= 3) {
+            Epsilon eps = epsilon();
+            intersection = PolyBool.intersect(eps, polyA, polyB);
+        }
+
+        return intersection.getRegions().get(0);
 
     }
 

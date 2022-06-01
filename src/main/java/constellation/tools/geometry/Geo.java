@@ -3,14 +3,16 @@ package constellation.tools.geometry;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import net.sf.geographiclib.*;
+import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
 import java.awt.geom.Path2D;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Contains Geographic operations
- * */
+ */
 public class Geo {
 
     /**
@@ -118,6 +120,109 @@ public class Geo {
 
     }
 
+    /**
+     * This method returns a polygon that approximates a circular access area centered at (centerLat, centerLon) with
+     * a radius of lambdaMax and the passed number of segments
+     *
+     * @param lambdaMax the Maximum Earth Central Angle
+     * @param centerLat the latitude of the circle's center
+     * @param centerLon the longitude of the circle's center
+     * @param segments  the amount of segments for the polygon
+     * @return a List of double[] containing the polygon (counter clock-wise direction)
+     **/
+    public List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+
+        List<double[]> coordinates = new ArrayList<>();
+
+        double lambdaMaxRads = Math.toRadians(lambdaMax);
+        double theta;
+
+        // Obtain center latitude' in radians
+        double centerLat_ = (Math.PI / 2.0) - (Math.toRadians(centerLat));
+
+        for (int segment = 1; segment <= segments; segment++) {
+
+            // Get the sweep angle
+            theta = (segment * 2 * Math.PI) / segments;
+
+            // Obtain current Latitude'
+            double pointerLat_ = Math.acos(Math.cos(lambdaMaxRads) * Math.cos(centerLat_)
+                    + Math.sin(lambdaMaxRads) * Math.sin(centerLat_) * Math.cos(theta));
+
+            double pointerLat = Math.toDegrees((Math.PI / 2.0) - pointerLat_);
+
+            // Obtain Longitude
+            double H = 1;
+            double cl_mod_360 = Math.toDegrees(centerLat_) % 360;
+            if (180 <= cl_mod_360 && cl_mod_360 < 360) {
+                H = -1;
+            }
+
+            double deltaLonArgument = ((Math.cos(lambdaMaxRads) - Math.cos(pointerLat_) * Math.cos(centerLat_))
+                    / (H * Math.sin(centerLat_) * Math.sin(pointerLat_)));
+
+            // Fix for precision problem near theta ~ PI
+            if (deltaLonArgument > 1.0000) {
+                deltaLonArgument = 1.0000;
+            } else if (deltaLonArgument < -1.0000) {
+                deltaLonArgument = -1.00000;
+            }
+
+            double deltaLon = Math.acos(deltaLonArgument) - (Math.PI / 2) * (H - 1);
+
+            double pointerLon = centerLon + Math.toDegrees(deltaLon);
+            if (theta <= Math.PI) {
+                pointerLon = centerLon - Math.toDegrees(deltaLon);
+            }
+
+            // Correct special cases
+            if (centerLat == -90.0) {
+                pointerLon = Math.toDegrees(theta);
+                pointerLat = -90.0 + lambdaMax;
+            } else if (centerLat == 90.0) {
+                pointerLon = Math.toDegrees(theta);
+                pointerLat = 90.0 - lambdaMax;
+            }
+
+            if (theta == 2 * Math.PI && (centerLat + lambdaMax) == 90.0) {
+                pointerLat = 90.0;
+                pointerLon = 0;
+            } else if (theta == 2 * Math.PI && (centerLat + lambdaMax) == -90.0) {
+                pointerLat = -90.0;
+                pointerLon = 0;
+            }
+
+            while (pointerLon < -180D) {
+                pointerLon = pointerLon + 360;
+            }
+
+            while (pointerLon > 180D) {
+                pointerLon = pointerLon - 360;
+            }
+
+            if (Double.isNaN(pointerLat) || Double.isNaN(pointerLon)) {
+
+                Log.debug("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
+                Log.debug("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
+                Log.debug("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
+                Log.debug("acos argument: " + deltaLonArgument);
+                Log.debug("acos: " + Math.acos(deltaLonArgument));
+                Log.debug("deltaLon = " + deltaLon);
+                Log.debug("pointerLon = " + pointerLon);
+                Log.debug("theta: " + theta);
+                Log.debug("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
+                        + " Math.cos(pointerLat_) = " + Math.cos(pointerLat_) + " Math.cos(centerLat_) = " + Math.cos(centerLat_)
+                        + " Math.sin(pointerLat_) = " + Math.sin(pointerLat_));
+
+            }
+
+            coordinates.add(new double[]{pointerLat, pointerLon});
+
+        }
+
+        return coordinates;
+
+    }
 
 
 }
