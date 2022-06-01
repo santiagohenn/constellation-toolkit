@@ -50,6 +50,7 @@ public class D3CO {
     private final String OUTPUT_PATH = (String) prop.get("output_path");
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
     private final boolean DEBUG = Boolean.parseBoolean((String) prop.get("debug_mode"));
+    private final long SNAPSHOT = Long.parseLong((String) prop.get("snapshot"));
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
@@ -62,7 +63,7 @@ public class D3CO {
 
     /**
      * Default constructor
-     * **/
+     **/
     public D3CO() {
 
 
@@ -154,7 +155,7 @@ public class D3CO {
                     List<Path2D.Double> polygonsToIntersect = new ArrayList<>();
                     FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygon(), referenceLat, referenceLon)));
 
-                    Path2D.Double resultingPolygon =  new Path2D.Double(polygonsToIntersect.get(0));
+                    Path2D.Double resultingPolygon = new Path2D.Double(polygonsToIntersect.get(0));
 
                     for (Path2D.Double polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
@@ -205,27 +206,33 @@ public class D3CO {
 
         }
 
-        saveAccessRegions(nonEuclideanAAPs, "NEPolygons_"); // FIXME DEBUG
-        saveAccessRegions(euclideanAAPs, "EPolygons_");
+        saveAAPs(nonEuclideanAAPs, "NEPolygons_");
+        saveAAPs(euclideanAAPs, "EPolygons_");
+
+        saveAAPsAt(nonEuclideanAAPs, "NEPolygons_debug", SNAPSHOT);
+        saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
 
         reportGenerator.saveAsCSV(statistics, "stats");
 
     }
 
-    private void saveAccessRegions(List<AAP> AAPs, String fileName) {
+    private void saveAAPs(List<AAP> AAPs, String fileName) {
 
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
 
             reportGenerator.saveAsJSON(AAPs.stream()
-                            .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
-                            .collect(Collectors.toList()),fileName + "_" + nOfGw);
+                    .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
+                    .collect(Collectors.toList()), fileName + "_" + nOfGw);
         }
 
-        // DEBUG
+    }
+
+    private void saveAAPsAt(List<AAP> AAPs, String fileName, long time) {
+
         reportGenerator.saveAsJSON(AAPs.stream()
-                .filter(AAP -> AAP.getDate() == 780000)
-                .collect(Collectors.toList()),fileName + "debug");
+                .filter(AAP -> AAP.getDate() == time)
+                .collect(Collectors.toList()), fileName + "debug");
 
     }
 
@@ -281,7 +288,7 @@ public class D3CO {
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
             double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
-            Path2D.Double polygon = drawAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
+            Path2D.Double polygon = drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), polygon);
             FOV.setSurface(Geo.computeNonEuclideanSurface(polygon));
@@ -405,7 +412,7 @@ public class D3CO {
      * @param segments  the amount of segments for the polygon
      * @return a Path2D.Double containing the polygon (counter clock-wise direction)
      **/
-    public Path2D.Double drawAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public Path2D.Double drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         // java.awt.geom
         Path2D.Double euclideanPolygon = new Path2D.Double();
