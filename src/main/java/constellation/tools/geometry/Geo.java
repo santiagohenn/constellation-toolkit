@@ -92,6 +92,26 @@ public class Geo {
     }
 
     /**
+     * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
+     * vertices. This method uses the net.sf.geographiclib library.
+     *
+     * @param pairList A List containing the coordinates of the polygon
+     * @return Double the computed area in meters squared
+     **/
+    public static double computeNonEuclideanSurface2(List<double[]> pairList) {
+
+        PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
+
+        for (double[] pair : pairList) {
+            polygonArea.AddPoint(pair[0], pair[1]);
+        }
+
+        PolygonResult result = polygonArea.Compute();
+        return Math.abs(result.area);
+
+    }
+
+    /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
      * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
      *
@@ -130,7 +150,7 @@ public class Geo {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public static List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 

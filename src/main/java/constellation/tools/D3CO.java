@@ -82,7 +82,7 @@ public class D3CO {
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
 
             // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeStartingFOVsAt(satelliteList, pointerDate);
+            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, pointerDate);
 
             // Store the SSPs (per Guido's request)
             List<Pair> SSPs = new ArrayList<>();
@@ -123,7 +123,7 @@ public class D3CO {
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
 
             // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeStartingFOVsAt(satelliteList, pointerDate);
+            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, pointerDate);
 
             // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
             Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
@@ -278,7 +278,7 @@ public class D3CO {
      * @param date          an AbsoluteDate object
      * @return a List of Regions
      **/
-    private List<FOV> computeStartingFOVsAt(List<Satellite> satelliteList, AbsoluteDate date) {
+    private List<FOV> computeFOVsAt(List<Satellite> satelliteList, AbsoluteDate date) {
 
         Simulation simulation = new Simulation();
         List<FOV> FOVList = new ArrayList<>();
@@ -289,9 +289,17 @@ public class D3CO {
 
             double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
             Path2D.Double polygon = drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
+            List<double[]> poly = Geo.drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), polygon);
-            FOV.setSurface(Geo.computeNonEuclideanSurface(polygon));
+            FOV.setPolygonCoordinates(poly);
+
+            double surface1 = Geo.computeNonEuclideanSurface(polygon);
+            double surface2 = Geo.computeNonEuclideanSurface2(poly);
+
+            Log.debug("surf 1: " + surface1 + ", surf 2:" + surface2);
+
+            FOV.setSurface(surface1);
             FOVList.add(FOV);
         }
 
