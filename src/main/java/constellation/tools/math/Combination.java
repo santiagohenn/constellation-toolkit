@@ -1,4 +1,4 @@
-package analysis.math;
+package constellation.tools.math;
 
 import java.util.ArrayList;
 import java.util.List;
