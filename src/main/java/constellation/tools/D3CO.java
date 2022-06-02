@@ -135,47 +135,45 @@ public class D3CO {
                 List<Pair> nonEuclideanCoordinates = new ArrayList<>();
                 List<Pair> euclideanCoordinates = new ArrayList<>();
 
+                // assemble a list of the FOVs to be intersected at this time step:
                 List<FOV> FOVsToIntersect = new ArrayList<>();
                 combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
 
+                // Get reference point for the projection
                 int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
                 double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                 double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
-                // If this is the starting FOV
+                // If this is the immediate FOV for a single satellite
                 if (combination.size() <= 1) {
                     int fovIdx = combination.get(0);
                     FOV neFov = nonEuclideanFOVs.get(fovIdx);
                     surfaceInKm = neFov.getSurfaceKm2();
-                    nonEuclideanCoordinates = Transformations.polygon2pairList(nonEuclideanFOVs.get(fovIdx).getPolygon());
-                    euclideanCoordinates = Transformations.polygon2pairList(Transformations.toEuclideanPlane(neFov.getPolygon(), referenceLat, referenceLon));
+                    nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates());
+                    euclideanCoordinates = Transformations.doubleList2pairList(Transformations
+                            .toEuclideanPlane(neFov.getPolygonCoordinates(), referenceLat, referenceLon));
 
                 } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {    // FIXME optimize transforming every starting AAP to stereographic
 
-                    List<Path2D.Double> polygonsToIntersect = new ArrayList<>();
-                    FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygon(), referenceLat, referenceLon)));
+                    List<List<double[]>> polygonsToIntersect = new ArrayList<>();
+                    FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-                    Path2D.Double resultingPolygon = new Path2D.Double(polygonsToIntersect.get(0));
+                    List<double[]> resultingPolygon = polygonsToIntersect.get(0);
 
-                    for (Path2D.Double polygon : polygonsToIntersect) {
+                    for (List<double[]> polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
 
                         resultingPolygon = intersectAndGetPolygon(resultingPolygon, polygon);
 
                     }
 
-                    euclideanCoordinates = Transformations.polygon2pairList(resultingPolygon);
+                    euclideanCoordinates = Transformations.doubleList2pairList(resultingPolygon);
 
-                    // Fixme use just polygon, etymologically "area" brings too much confusion
-
-                    // When going back to the non euclidean plane we cannot use area2pairList since, naturally, the Area object cannot be filled in that plane
-                    Path2D.Double nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
-                    nonEuclideanCoordinates = Transformations.polygon2pairList(nonEuclideanIntersection);
+                    List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
+                    nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanIntersection);
 
                     surfaceInKm = Geo.computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
 
-                } else {
-                    surfaceInKm = 0D;
                 }
 
                 // Area accumulator and store // 1.1 FIXME Replace with post-surface filter and accumulator
@@ -422,7 +420,7 @@ public class D3CO {
         regions1.add(polygonA);
 
         List<List<double[]>> regions2 = new ArrayList<>();
-        regions1.add(polygonB);
+        regions2.add(polygonB);
 
         Polygon polyA = new Polygon(regions1);
         Polygon polyB = new Polygon(regions2);
