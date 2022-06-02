@@ -158,7 +158,7 @@ public class D3CO {
                     List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                     FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-                    List<double[]> resultingPolygon = polygonsToIntersect.get(0);
+                    List<double[]> resultingPolygon = new ArrayList<>(polygonsToIntersect.get(0));
 
                     for (List<double[]> polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
@@ -166,11 +166,15 @@ public class D3CO {
                         resultingPolygon = intersectAndGetPolygon(resultingPolygon, polygon);
 
                     }
-
                     euclideanCoordinates = Transformations.doubleList2pairList(resultingPolygon);
 
                     List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanIntersection);
+                    Log.debug("nonEuclideanIntersection: " + nonEuclideanIntersection.size() + " - nonEuclideanSize: " + nonEuclideanCoordinates.size());
+
+                    if (timeSinceStart == SNAPSHOT) {
+                        nonEuclideanCoordinates.forEach(System.out::println);
+                    }
 
                     surfaceInKm = Geo.computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
 
@@ -204,8 +208,8 @@ public class D3CO {
 
         }
 
-        saveAAPs(nonEuclideanAAPs, "NEPolygons_");
-        saveAAPs(euclideanAAPs, "EPolygons_");
+        saveAAPs(nonEuclideanAAPs, "NEPolygons");
+        saveAAPs(euclideanAAPs, "EPolygons");
 
         saveAAPsAt(nonEuclideanAAPs, "NEPolygons_debug", SNAPSHOT);
         saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
@@ -227,11 +231,9 @@ public class D3CO {
     }
 
     private void saveAAPsAt(List<AAP> AAPs, String fileName, long time) {
-
         reportGenerator.saveAsJSON(AAPs.stream()
                 .filter(AAP -> AAP.getDate() == time)
-                .collect(Collectors.toList()), fileName + "debug");
-
+                .collect(Collectors.toList()), fileName);
     }
 
     private void saveSSPs(List<ConstellationSSPs> constellationSSPs) {
@@ -430,6 +432,8 @@ public class D3CO {
             Epsilon eps = epsilon();
             intersection = PolyBool.intersect(eps, polyA, polyB);
         }
+
+        Log.debug("Polygon intersection size: " + intersection.getRegions().get(0).size());
 
         return intersection.getRegions().get(0);
 

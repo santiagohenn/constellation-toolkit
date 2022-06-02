@@ -92,6 +92,8 @@ public class Transformations {
             while (lon < -180D) lon += 360;
             while (lon > 180D) lon -= 360;
 
+            GCSPolygon.add(new double[]{lat, lon});
+
         }
 
         return GCSPolygon;
