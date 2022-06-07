@@ -44,6 +44,7 @@ public class D3CO {
     }
 
     private final String START_DATE = (String) prop.get("start_date");
+    private final long UNIX_START_DATE = Utils.stamp2unix(START_DATE);
     private final String END_DATE = (String) prop.get("end_date");
     private final double TIME_STEP = Double.parseDouble((String) prop.get("time_step"));
     private final String OUTPUT_PATH = (String) prop.get("output_path");
@@ -162,17 +163,16 @@ public class D3CO {
 
                     for (List<double[]> polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-
                         resultingPolygon = intersectAndGetPolygon(resultingPolygon, polygon);
-
                     }
                     euclideanCoordinates = Transformations.doubleList2pairList(resultingPolygon);
 
                     List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanIntersection);
+                    // FIXME REMOVE THIS
                     Log.debug("nonEuclideanIntersection: " + nonEuclideanIntersection.size() + " - nonEuclideanSize: " + nonEuclideanCoordinates.size());
 
-                    if (timeSinceStart == SNAPSHOT) {
+                    if (timeSinceStart == SNAPSHOT) { // FIXME REMOVE THIS
                         nonEuclideanCoordinates.forEach(System.out::println);
                     }
 
@@ -188,12 +188,12 @@ public class D3CO {
                 }
 
                 // Save AAPs
-                nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination,
+                nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, nonEuclideanCoordinates,
                         nonEuclideanCoordinates.stream().map(pair -> pair.lat).collect(Collectors.toList()),
                         nonEuclideanCoordinates.stream().map(pair -> pair.lon).collect(Collectors.toList()),
                         surfaceInKm));
 
-                euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination,
+                euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
                         euclideanCoordinates.stream().map(pair -> pair.lat).collect(Collectors.toList()),
                         euclideanCoordinates.stream().map(pair -> pair.lon).collect(Collectors.toList()),
                         surfaceInKm));
@@ -215,6 +215,47 @@ public class D3CO {
         saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
 
         reportGenerator.saveAsCSV(statistics, "stats");
+
+//        analyzeSurfaceCoverage(nonEuclideanAAPs);
+
+    }
+
+    public void analyzeSurfaceCoverage(List<AAP> AAPs) {
+
+        statistics.clear();
+
+        AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
+        AbsoluteDate pointerDate = Utils.stamp2AD(START_DATE);
+
+        // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
+        Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
+
+        while (pointerDate.compareTo(endDate) <= 0) {
+
+            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+            AAPs.stream().filter(AAP -> AAP.getDate() == timeSinceStart).forEach(AAP -> {
+
+                double surfaceInKm2 = Geo.computeNonEuclideanSurface(AAP.getNonEuclideanCoordinates()) * 1E-6;
+                int nAssets = AAP.getnOfGwsInSight();
+                // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+                if (accumulatedAreas.containsKey(nAssets)) {
+                    accumulatedAreas.put(nAssets, accumulatedAreas.get(nAssets) + surfaceInKm2);
+                } else {
+                    accumulatedAreas.put(nAssets, surfaceInKm2);
+                }
+                AAP.setSurfaceInKm2(surfaceInKm2);
+
+            });
+
+            // Save the results // FIXME Define a result object
+            statistics.add(stringifyResults(pointerDate, accumulatedAreas));
+
+            // Advance to the next time step
+            pointerDate = pointerDate.shiftedBy(TIME_STEP);
+
+        }
+
+        reportGenerator.saveAsCSV(statistics, "stats2");
 
     }
 
@@ -259,7 +300,7 @@ public class D3CO {
     private String stringifyResults(AbsoluteDate pointerDate, Map<Integer, Double> accumulatedAreas) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append(Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE));
+        sb.append(Utils.stamp2unix(pointerDate.toString()) - UNIX_START_DATE);
 
         for (Integer key : accumulatedAreas.keySet()) {
             sb.append(",");

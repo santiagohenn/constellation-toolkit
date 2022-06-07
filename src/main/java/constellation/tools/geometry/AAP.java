@@ -1,11 +1,14 @@
 package constellation.tools.geometry;
 
+import constellation.tools.math.Pair;
+
 import java.util.List;
 
 public class AAP {
 
     private long date;
     private int nOfGwsInSight;
+    private List<Pair> nonEuclideanCoordinates;
     private List<Double> lats;
     private List<Double> longs;
     List<Integer> gwsInSight;
@@ -15,10 +18,12 @@ public class AAP {
 
     }
 
-    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<Double> lats, List<Double> longs, double surfaceInKm2) {
+    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<Pair> nonEuclideanCoordinates
+            , List<Double> lats, List<Double> longs, double surfaceInKm2) {
         this.date = date;
         this.nOfGwsInSight = nOfGwsInSight;
         this.gwsInSight = gwsInSight;
+        this.nonEuclideanCoordinates = nonEuclideanCoordinates;
         this.lats = lats;
         this.longs = longs;
         this.surfaceInKm2 = surfaceInKm2;
@@ -46,6 +51,10 @@ public class AAP {
 
     public void setGwsInSight(List<Integer> gwsInSight) {
         this.gwsInSight = gwsInSight;
+    }
+
+    public List<Pair> getNonEuclideanCoordinates() {
+        return nonEuclideanCoordinates;
     }
 
     public List<Double> getLats() {
