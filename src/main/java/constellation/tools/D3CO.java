@@ -21,7 +21,6 @@ import satellite.tools.structures.Ephemeris;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Path2D;
 import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -154,6 +153,7 @@ public class D3CO {
                             .toEuclideanPlane(neFov.getPolygonCoordinates(), referenceLat, referenceLon));
 
                 } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {    // FIXME optimize transforming every starting AAP to stereographic
+
 
                     List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                     FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
@@ -288,18 +288,14 @@ public class D3CO {
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
             double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
-            Path2D.Double polygon = drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
             List<double[]> poly = Geo.drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
-            FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), polygon);
+            FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), poly);
             FOV.setPolygonCoordinates(poly);
 
-            double surface1 = Geo.computeNonEuclideanSurface(polygon);
-            double surface2 = Geo.computeNonEuclideanSurface2(poly);
+            double surface = Geo.computeNonEuclideanSurface2(poly);
 
-            Log.debug("surf 1: " + surface1 + ", surf 2:" + surface2);
-
-            FOV.setSurface(surface1);
+            FOV.setSurface(surface);
             FOVList.add(FOV);
         }
 
@@ -358,58 +354,6 @@ public class D3CO {
         return 0;
     }
 
-
-    /**
-     * Checks whether the provided FOV contains any of Earth's poles // TODO fix this comment
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private Path2D.Double intersectAndGetPolygon(Path2D.Double polygon1, Path2D.Double polygon2) {
-
-        // Transform polygon1 to Polygol Polygon
-        List<List<double[]>> regions1 = new ArrayList<>();
-        List<double[]> coordinates = new ArrayList<>();
-        List<Pair> pairList = Transformations.polygon2pairList(polygon1);
-
-        pairList.forEach(pair -> coordinates.add(pair.getPoint()));
-
-        regions1.add(coordinates);
-        Polygon polyA = new Polygon(regions1);
-
-        List<List<double[]>> regions2 = new ArrayList<>();
-        List<double[]> coordinates2 = new ArrayList<>();
-        List<Pair> pairList2 = Transformations.polygon2pairList(polygon2);
-
-        pairList2.forEach(pair -> coordinates2.add(pair.getPoint()));
-
-        regions2.add(coordinates2);
-        Polygon polyB = new Polygon(regions2);
-
-        Epsilon eps = epsilon();
-
-        Path2D.Double intersectionPolygon = new Path2D.Double();
-
-        if (polyA.getRegions().get(0).size() >= 3 && polyB.getRegions().get(0).size() >= 3) {
-
-            Polygon intersection = PolyBool.intersect(eps, polyA, polyB);
-
-            if (!intersection.getRegions().isEmpty()) {
-                intersection.getRegions().get(0).forEach(pair -> {
-                    if (intersection.getRegions().get(0).indexOf(pair) != 0) {
-                        intersectionPolygon.lineTo(pair[0], pair[1]);
-                    } else {
-                        intersectionPolygon.moveTo(pair[0], pair[1]);
-                    }
-                });
-            }
-
-        }
-
-        return intersectionPolygon;
-
-    }
-
     /**
      * ... Polybool intersection from list of double[]
      *
@@ -433,118 +377,7 @@ public class D3CO {
             intersection = PolyBool.intersect(eps, polyA, polyB);
         }
 
-        Log.debug("Polygon intersection size: " + intersection.getRegions().get(0).size());
-
         return intersection.getRegions().get(0);
-
-    }
-
-    /**
-     * This method returns a polygon that approximates a circular access area centered at (centerLat, centerLon) with
-     * a radius of lambdaMax and the passed number of segments
-     *
-     * @param lambdaMax the Maximum Earth Central Angle
-     * @param centerLat the latitude of the circle's center
-     * @param centerLon the longitude of the circle's center
-     * @param segments  the amount of segments for the polygon
-     * @return a Path2D.Double containing the polygon (counter clock-wise direction)
-     **/
-    public Path2D.Double drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
-
-        // java.awt.geom
-        Path2D.Double euclideanPolygon = new Path2D.Double();
-
-        double lambdaMaxRads = Math.toRadians(lambdaMax);
-        double theta;
-
-        // Obtain center latitude' in radians
-        double centerLat_ = (Math.PI / 2.0) - (Math.toRadians(centerLat));
-
-        for (int segment = 1; segment <= segments; segment++) {
-
-            // Get the sweep angle
-            theta = (segment * 2 * Math.PI) / segments;
-
-            // Obtain current Latitude'
-            double pointerLat_ = Math.acos(Math.cos(lambdaMaxRads) * Math.cos(centerLat_)
-                    + Math.sin(lambdaMaxRads) * Math.sin(centerLat_) * Math.cos(theta));
-
-            double pointerLat = Math.toDegrees((Math.PI / 2.0) - pointerLat_);
-
-            // Obtain Longitude
-            double H = 1;
-            double cl_mod_360 = Math.toDegrees(centerLat_) % 360;
-            if (180 <= cl_mod_360 && cl_mod_360 < 360) {
-                H = -1;
-            }
-
-            double deltaLonArgument = ((Math.cos(lambdaMaxRads) - Math.cos(pointerLat_) * Math.cos(centerLat_))
-                    / (H * Math.sin(centerLat_) * Math.sin(pointerLat_)));
-
-            // Fix for precision problem near theta ~ PI
-            if (deltaLonArgument > 1.0000) {
-                deltaLonArgument = 1.0000;
-            } else if (deltaLonArgument < -1.0000) {
-                deltaLonArgument = -1.00000;
-            }
-
-            double deltaLon = Math.acos(deltaLonArgument) - (Math.PI / 2) * (H - 1);
-
-            double pointerLon = centerLon + Math.toDegrees(deltaLon);
-            if (theta <= Math.PI) {
-                pointerLon = centerLon - Math.toDegrees(deltaLon);
-            }
-
-            // Correct special cases
-            if (centerLat == -90.0) {
-                pointerLon = Math.toDegrees(theta);
-                pointerLat = -90.0 + lambdaMax;
-            } else if (centerLat == 90.0) {
-                pointerLon = Math.toDegrees(theta);
-                pointerLat = 90.0 - lambdaMax;
-            }
-
-            if (theta == 2 * Math.PI && (centerLat + lambdaMax) == 90.0) {
-                pointerLat = 90.0;
-                pointerLon = 0;
-            } else if (theta == 2 * Math.PI && (centerLat + lambdaMax) == -90.0) {
-                pointerLat = -90.0;
-                pointerLon = 0;
-            }
-
-            while (pointerLon < -180D) {
-                pointerLon = pointerLon + 360;
-            }
-
-            while (pointerLon > 180D) {
-                pointerLon = pointerLon - 360;
-            }
-
-            if (Double.isNaN(pointerLat) || Double.isNaN(pointerLon)) {
-
-                Log.debug("Segment: " + segment + " Center coordinates: (" + centerLat + "," + centerLon + ")");
-                Log.debug("centerLat_ = " + centerLat_ + " - centerLatDeg_ = " + Math.toDegrees(centerLat_));
-                Log.debug("Math.toDegrees(centerLat_) % 360 = " + (Math.toDegrees(centerLat_) % 360));
-                Log.debug("acos argument: " + deltaLonArgument);
-                Log.debug("acos: " + Math.acos(deltaLonArgument));
-                Log.debug("deltaLon = " + deltaLon);
-                Log.debug("pointerLon = " + pointerLon);
-                Log.debug("theta: " + theta);
-                Log.debug("Math.cos(lambdaMaxRads) = " + Math.cos(lambdaMaxRads)
-                        + " Math.cos(pointerLat_) = " + Math.cos(pointerLat_) + " Math.cos(centerLat_) = " + Math.cos(centerLat_)
-                        + " Math.sin(pointerLat_) = " + Math.sin(pointerLat_));
-
-            }
-
-            if (segment == 1) {
-                euclideanPolygon.moveTo(pointerLat, pointerLon);
-            } else {
-                euclideanPolygon.lineTo(pointerLat, pointerLon);
-            }
-
-        }
-
-        return euclideanPolygon;
 
     }
 

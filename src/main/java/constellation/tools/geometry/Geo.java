@@ -1,12 +1,10 @@
 package constellation.tools.geometry;
 
 import constellation.tools.math.Pair;
-import constellation.tools.math.Transformations;
 import net.sf.geographiclib.*;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,17 +56,6 @@ public class Geo {
         GeodesicData g = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2,
                 GeodesicMask.DISTANCE);
         return g.a12;
-    }
-
-
-    /**
-     * This method computes the geodetic area of a Path2D.Double object
-     *
-     * @param polygon The Path2D.Double Object depicting the polygon
-     * @return a double value of the computed area in meters squared
-     **/
-    public static double computeNonEuclideanSurface(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(Transformations.polygon2pairList(polygon));
     }
 
     /**

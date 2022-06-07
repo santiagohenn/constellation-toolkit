@@ -2,9 +2,6 @@ package constellation.tools.math;
 
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Area;
-import java.awt.geom.Path2D;
-import java.awt.geom.PathIterator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -117,27 +114,6 @@ public class Transformations {
 
     }
 
-    public static synchronized List<Pair> polygon2pairList(Path2D.Double polygon) {
-
-        List<Pair> pairList = new ArrayList<>();
-
-        PathIterator pathIterator = polygon.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
-        }
-
-        return pairList;
-
-    }
 
     public static synchronized List<Pair> doubleList2pairList(List<double[]> polygon) {
 
@@ -145,28 +121,6 @@ public class Transformations {
 
         for (double[] coordinate : polygon) {
             pairList.add(new Pair(coordinate[0], coordinate[1]));
-        }
-
-        return pairList;
-
-    }
-
-    public static synchronized List<Pair> area2pairList(Area area) {
-
-        List<Pair> pairList = new ArrayList<>();
-
-        PathIterator pathIterator = area.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
         }
 
         return pairList;
