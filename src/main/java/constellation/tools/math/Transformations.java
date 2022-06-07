@@ -2,9 +2,6 @@ package constellation.tools.math;
 
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Area;
-import java.awt.geom.Path2D;
-import java.awt.geom.PathIterator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,29 +15,22 @@ public class Transformations {
     private static Map<Double, Double> radii = new HashMap<>();
     private static final boolean USE_CONFORMAL_LATITUDE = false;
 
-    public static Path2D.Double toEuclideanPlane(Path2D.Double geographicPolygon, double referenceLat, double referenceLon) {
+    public static List<double[]> toEuclideanPlane(List<double[]> nonEuclideanPolygon, double referenceLat, double referenceLon) {
 
         radii.clear();
-        Path2D.Double euclideanPolygon = new Path2D.Double();
-        PathIterator iterator = geographicPolygon.getPathIterator(null);
+
+        List<double[]> euclideanPolygon = new ArrayList<>();
 
         // Transform reference GCS coordinates to radians
         final double referenceLatRads = Math.toRadians(referenceLat);
         final double referenceLonRads = Math.toRadians(referenceLon);
 
         int segment = 0;
-        while (!iterator.isDone()) {
 
-            final double[] coordinate = new double[2];
-            iterator.currentSegment(coordinate);
+        for (double[] nePair : nonEuclideanPolygon) {
 
-            if (iterator.currentSegment(coordinate) == PathIterator.SEG_CLOSE) {
-                euclideanPolygon.closePath();
-                break;
-            }
-
-            double lat = Math.toRadians(coordinate[0]);
-            double lon = Math.toRadians(coordinate[1]);
+            double lat = Math.toRadians(nePair[0]);
+            double lon = Math.toRadians(nePair[1]);
             double localRadius = Utils.EARTH_RADIUS_AVG_KM;
             if (USE_CONFORMAL_LATITUDE) localRadius = computeLocalRadius(lat);
 
@@ -50,16 +40,9 @@ public class Transformations {
             double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
             double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
 
+            euclideanPolygon.add(new double[]{xStereo, yStereo});
+
             radii.put(yStereo, localRadius);
-
-            if (segment == 0) {
-                euclideanPolygon.moveTo(xStereo, yStereo);
-            } else {
-                euclideanPolygon.lineTo(xStereo, yStereo);
-            }
-
-            segment++;
-            iterator.next();
 
         }
 
@@ -67,29 +50,18 @@ public class Transformations {
 
     }
 
-    public static Path2D.Double toNonEuclideanPlane(Path2D.Double euclideanPolygon, double referenceLat, double referenceLon) {
+    public static List<double[]> toNonEuclideanPlane(List<double[]> euclideanPolygon, double referenceLat, double referenceLon) {
 
-        Path2D.Double GCSPolygon = new Path2D.Double();
+        List<double[]> GCSPolygon = new ArrayList<>();
 
         // Transform to radians
         double referenceLatRads = Math.toRadians(referenceLat);
         double referenceLonRads = Math.toRadians(referenceLon);
 
-        PathIterator iterator = euclideanPolygon.getPathIterator(null);
+        for (double[] ePair : euclideanPolygon) {
 
-        int segment = 0;
-
-        while(!iterator.isDone()) {
-
-            final double[] coordinate = new double[2];
-            int segType = iterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            double xStereo = coordinate[0];
-            double yStereo = coordinate[1];
+            double xStereo = ePair[0];
+            double yStereo = ePair[1];
 
             double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
 
@@ -117,14 +89,7 @@ public class Transformations {
             while (lon < -180D) lon += 360;
             while (lon > 180D) lon -= 360;
 
-            if (segment == 0) {
-                GCSPolygon.moveTo(lat, lon);
-            } else {
-                GCSPolygon.lineTo(lat, lon);
-            }
-
-            segment++;
-            iterator.next();
+            GCSPolygon.add(new double[]{lat, lon});
 
         }
 
@@ -149,44 +114,13 @@ public class Transformations {
 
     }
 
-    public static synchronized List<Pair> polygon2pairList(Path2D.Double polygon) {
+
+    public static synchronized List<Pair> doubleList2pairList(List<double[]> polygon) {
 
         List<Pair> pairList = new ArrayList<>();
 
-        PathIterator pathIterator = polygon.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
+        for (double[] coordinate : polygon) {
             pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
-        }
-
-        return pairList;
-
-    }
-
-    public static synchronized List<Pair> area2pairList(Area area) {
-
-        List<Pair> pairList = new ArrayList<>();
-
-        PathIterator pathIterator = area.getPathIterator(null);
-
-        while(!pathIterator.isDone()) {
-            final double[] coordinate = new double[2];
-            int segType = pathIterator.currentSegment(coordinate);
-
-            if (segType == PathIterator.SEG_CLOSE) {
-                break;
-            }
-
-            pairList.add(new Pair(coordinate[0], coordinate[1]));
-            pathIterator.next();
         }
 
         return pairList;

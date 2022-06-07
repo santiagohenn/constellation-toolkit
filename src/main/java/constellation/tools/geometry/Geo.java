@@ -1,12 +1,10 @@
 package constellation.tools.geometry;
 
 import constellation.tools.math.Pair;
-import constellation.tools.math.Transformations;
 import net.sf.geographiclib.*;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
-import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,17 +58,6 @@ public class Geo {
         return g.a12;
     }
 
-
-    /**
-     * This method computes the geodetic area of a Path2D.Double object
-     *
-     * @param polygon The Path2D.Double Object depicting the polygon
-     * @return a double value of the computed area in meters squared
-     **/
-    public static double computeNonEuclideanSurface(Path2D.Double polygon) {
-        return computeNonEuclideanSurface(Transformations.polygon2pairList(polygon));
-    }
-
     /**
      * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
      * vertices. This method uses the net.sf.geographiclib library.
@@ -84,6 +71,26 @@ public class Geo {
 
         for (Pair pair : pairList) {
             polygonArea.AddPoint(pair.lat, pair.lon);
+        }
+
+        PolygonResult result = polygonArea.Compute();
+        return Math.abs(result.area);
+
+    }
+
+    /**
+     * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
+     * vertices. This method uses the net.sf.geographiclib library.
+     *
+     * @param pairList A List containing the coordinates of the polygon
+     * @return Double the computed area in meters squared
+     **/
+    public static double computeNonEuclideanSurface2(List<double[]> pairList) {
+
+        PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
+
+        for (double[] pair : pairList) {
+            polygonArea.AddPoint(pair[0], pair[1]);
         }
 
         PolygonResult result = polygonArea.Compute();
@@ -130,7 +137,7 @@ public class Geo {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public static List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 
