@@ -19,6 +19,11 @@ public class AAP {
     }
 
     public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<Pair> nonEuclideanCoordinates
+            , List<Double> lats, List<Double> longs) {
+        this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0);
+    }
+
+    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<Pair> nonEuclideanCoordinates
             , List<Double> lats, List<Double> longs, double surfaceInKm2) {
         this.date = date;
         this.nOfGwsInSight = nOfGwsInSight;
