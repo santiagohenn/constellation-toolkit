@@ -388,7 +388,7 @@ public class D3CO {
                 return proximity;
             }
         }
-        return 0;
+        return 1;
     }
 
     /**
