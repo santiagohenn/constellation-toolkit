@@ -236,7 +236,7 @@ public class D3CO {
 
         }
 
-        reportGenerator.saveAsCSV(statistics, "stats2");
+        reportGenerator.saveAsCSV(statistics, "stats");
 
     }
 
