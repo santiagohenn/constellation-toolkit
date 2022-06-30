@@ -34,14 +34,14 @@ public class D3CO {
 
     private static final Properties prop = Utils.loadProperties("config.properties");
     private static final String orekitPath = (String) prop.get("orekit_data_path");
-    private static final File orekitFile = Utils.loadFile(orekitPath);
+//    private static final File orekitFile = Utils.loadDirectory(orekitPath);
 
-    private static final DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-
-    static {
-        manager.addProvider(new DirectoryCrawler(orekitFile));
-        Log.debug("Manager loaded");
-    }
+//    private static final DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+//
+//    static {
+//        manager.addProvider(new DirectoryCrawler(orekitFile));
+//        Log.debug("Manager loaded");
+//    }
 
     private final String START_DATE = (String) prop.get("start_date");
     private final long UNIX_START_DATE = Utils.stamp2unix(START_DATE);
@@ -71,6 +71,8 @@ public class D3CO {
 
     public void runSSPs() {
 
+        Simulation simulation = new Simulation(orekitPath);
+
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate pointerDate = startDate;
@@ -82,7 +84,7 @@ public class D3CO {
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
 
             // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, pointerDate);
+            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, pointerDate);
 
             // Store the SSPs (per Guido's request)
             List<Pair> SSPs = new ArrayList<>();
@@ -99,10 +101,11 @@ public class D3CO {
 
         reportGenerator.saveAsCSV(statistics, "stats");
 
-
     }
 
     public void run() {
+
+        Simulation simulation = new Simulation(orekitPath);
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -124,7 +127,7 @@ public class D3CO {
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
 
             // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, pointerDate);
+            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, pointerDate);
 
             // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
             // Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
@@ -315,9 +318,8 @@ public class D3CO {
      * @param date          an AbsoluteDate object
      * @return a List of Regions
      **/
-    private List<FOV> computeFOVsAt(List<Satellite> satelliteList, AbsoluteDate date) {
+    private List<FOV> computeFOVsAt(List<Satellite> satelliteList, Simulation simulation, AbsoluteDate date) {
 
-        Simulation simulation = new Simulation();
         List<FOV> FOVList = new ArrayList<>();
 
         for (Satellite satellite : satelliteList) {
