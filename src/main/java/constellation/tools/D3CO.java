@@ -57,7 +57,6 @@ public class D3CO {
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
-    private final List<ConstellationSSPs> constellationSSPs = new ArrayList<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
@@ -66,38 +65,6 @@ public class D3CO {
      **/
     public D3CO() {
 
-
-    }
-
-    public void runSSPs() {
-
-        Simulation simulation = new Simulation(orekitPath);
-
-        AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
-        AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
-        AbsoluteDate pointerDate = startDate;
-        double scenarioDuration = endDate.durationFrom(startDate);
-
-        while (pointerDate.compareTo(endDate) <= 0) {
-
-            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
-            updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
-
-            // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, pointerDate);
-
-            // Store the SSPs (per Guido's request)
-            List<Pair> SSPs = new ArrayList<>();
-
-            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
-            constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
-
-            // Advance to the next time step
-            pointerDate = pointerDate.shiftedBy(TIME_STEP);
-
-        }
-
-        saveSSPs(constellationSSPs);
 
     }
 
@@ -256,10 +223,6 @@ public class D3CO {
         reportGenerator.saveAsJSON(AAPs.stream()
                 .filter(AAP -> AAP.getDate() == time)
                 .collect(Collectors.toList()), fileName);
-    }
-
-    private void saveSSPs(List<ConstellationSSPs> constellationSSPs) {
-        reportGenerator.saveAsJSON(constellationSSPs, "ConstellationSSPs");
     }
 
     private void updateProgressBar(double current, double total) {
