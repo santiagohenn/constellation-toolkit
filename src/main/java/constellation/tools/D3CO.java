@@ -99,8 +99,6 @@ public class D3CO {
 
         saveSSPs(constellationSSPs);
 
-        reportGenerator.saveAsCSV(statistics, "stats");
-
     }
 
     public void run() {
@@ -128,9 +126,6 @@ public class D3CO {
 
             // Obtain the starting non-euclidean FOVs and their surface value
             List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, pointerDate);
-
-            // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
-            // Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
 
             // double surfaceInKm = 0D;
 
@@ -175,16 +170,8 @@ public class D3CO {
 
                     List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanIntersection);
-                    // surfaceInKm = Geo.computeNonEuclideanSurface(nonEuclideanCoordinates) * 1E-6;
 
                 }
-
-                // Area accumulator and store // 1.1 FIXME Replace with post-surface filter and accumulator
-//                if (accumulatedAreas.containsKey(combination.size())) {
-//                    accumulatedAreas.put(combination.size(), accumulatedAreas.get(combination.size()) + surfaceInKm);
-//                } else {
-//                    accumulatedAreas.put(combination.size(), surfaceInKm);
-//                }
 
                 // Save AAPs
                 nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, nonEuclideanCoordinates,
@@ -197,9 +184,6 @@ public class D3CO {
 
             }
 
-            // Save the results // FIXME Define a result object
-//            statistics.add(stringifyResults(pointerDate, accumulatedAreas));
-
             // Advance to the next time step
             pointerDate = pointerDate.shiftedBy(TIME_STEP);
 
@@ -210,8 +194,6 @@ public class D3CO {
 
         saveAAPsAt(nonEuclideanAAPs, "NEPolygons_debug", SNAPSHOT);
         saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
-
-        reportGenerator.saveAsCSV(statistics, "stats");
 
         analyzeSurfaceCoverage(nonEuclideanAAPs);
 
