@@ -4,24 +4,18 @@ import com.menecats.polybool.Epsilon;
 import com.menecats.polybool.PolyBool;
 import com.menecats.polybool.models.Polygon;
 import constellation.tools.geometry.AAP;
-import constellation.tools.geometry.ConstellationSSPs;
 import constellation.tools.geometry.FOV;
 import constellation.tools.geometry.Geo;
 import constellation.tools.math.Combination;
 import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import constellation.tools.output.ReportGenerator;
-import org.orekit.data.DataContext;
-import org.orekit.data.DataProvidersManager;
-import org.orekit.data.DirectoryCrawler;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.structures.Ephemeris;
-import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
-import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,15 +28,6 @@ public class D3CO {
 
     private static final Properties prop = Utils.loadProperties("config.properties");
     private static final String orekitPath = (String) prop.get("orekit_data_path");
-//    private static final File orekitFile = Utils.loadDirectory(orekitPath);
-
-//    private static final DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-//
-//    static {
-//        manager.addProvider(new DirectoryCrawler(orekitFile));
-//        Log.debug("Manager loaded");
-//    }
-
     private final String START_DATE = (String) prop.get("start_date");
     private final long UNIX_START_DATE = Utils.stamp2unix(START_DATE);
     private final String END_DATE = (String) prop.get("end_date");
