@@ -14,6 +14,7 @@ import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.structures.Ephemeris;
+import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
 import java.util.*;
@@ -99,7 +100,6 @@ public class D3CO {
                 if (combination.size() <= 1) {
                     int fovIdx = combination.get(0);
                     FOV neFov = nonEuclideanFOVs.get(fovIdx);
-                    // surfaceInKm = neFov.getSurfaceKm2();
                     nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates());
                     euclideanCoordinates = Transformations.doubleList2pairList(Transformations
                             .toEuclideanPlane(neFov.getPolygonCoordinates(), referenceLat, referenceLon));
@@ -109,18 +109,19 @@ public class D3CO {
                     List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                     FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
+                    List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
 
-                    List<double[]> resultingPolygon = new ArrayList<>(polygonsToIntersect.get(0));
+//                    polygonsToIntersect.stream().skip(0).forEach(poly -> intersectAndGetPolygon(intersectedPolygon, poly));
 
-//                    polygonsToIntersect.stream().skip(0).forEach(poly -> intersectAndGetPolygon(resultingPolygon, poly));
-
+                    // Obtain access polygon
                     for (List<double[]> polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-                        resultingPolygon = intersectAndGetPolygon(resultingPolygon, polygon);
+                        intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
                     }
-                    euclideanCoordinates = Transformations.doubleList2pairList(resultingPolygon);
+                    // Intersected polygon euclidean coordinates
+                    euclideanCoordinates = Transformations.doubleList2pairList(intersectedPolygon);
 
-                    List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(resultingPolygon, referenceLat, referenceLon);
+                    List<double[]> nonEuclideanIntersection = Transformations.toNonEuclideanPlane(intersectedPolygon, referenceLat, referenceLon);
                     nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanIntersection);
 
                 }
@@ -148,6 +149,55 @@ public class D3CO {
         saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
 
         analyzeSurfaceCoverage(nonEuclideanAAPs);
+        analyzeROICoverage(nonEuclideanAAPs);
+
+    }
+
+    public void analyzeROICoverage(List<AAP> AAPs) {
+
+        // Load ROI Data:
+        List<double[]> ROI = Geo.file2DoubleList("roi.csv");
+        double roiSurface = Geo.computeNonEuclideanSurface2(ROI);
+        Log.debug("Area of ROI in Km2: " + roiSurface/1e6);
+
+        AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
+        AbsoluteDate pointerDate = Utils.stamp2AD(START_DATE);
+        AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
+        double scenarioDuration = endDate.durationFrom(startDate);
+
+        // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
+        Map<Integer, Double> accumulatedAreas = new HashMap<>(MAX_SUBSET_SIZE);
+
+        while (pointerDate.compareTo(endDate) <= 0) {
+
+            updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
+            accumulatedAreas.clear();
+
+            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+            AAPs.stream().filter(AAP -> AAP.getDate() == timeSinceStart).forEach(AAP -> {
+
+                double surfaceInKm2 = 0;
+
+                // List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
+
+                int nAssets = AAP.getnOfGwsInSight();
+                // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+                if (accumulatedAreas.containsKey(nAssets)) {
+                    accumulatedAreas.put(nAssets, accumulatedAreas.get(nAssets) + surfaceInKm2);
+                } else {
+                    accumulatedAreas.put(nAssets, surfaceInKm2);
+                }
+                AAP.setSurfaceInKm2(surfaceInKm2);
+
+            });
+
+            // Save the results
+            statistics.add(stringifyResults(pointerDate, accumulatedAreas));
+
+            // Advance to the next time step
+            pointerDate = pointerDate.shiftedBy(TIME_STEP);
+
+        }
 
     }
 

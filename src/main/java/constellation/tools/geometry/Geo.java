@@ -5,6 +5,7 @@ import net.sf.geographiclib.*;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -229,6 +230,34 @@ public class Geo {
 
         return coordinates;
 
+    }
+
+    /**
+     * Reads a file containing asset(s) parameter(s) and returns a list of objects accordingly
+     *
+     * @return List<Pair>
+     */
+    public static List<double[]> file2DoubleList(String fileName) {
+
+        List<double[]> pairList = new ArrayList<>();
+        var file = new File(fileName);
+        try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.startsWith("//") && line.length() > 0) {
+                    var data = line.split(",");
+                    pairList.add(new double[]{Double.parseDouble(data[0]), Double.parseDouble(data[1])});
+                }
+            }
+        } catch (FileNotFoundException e) {
+            Log.error("Unable to find file: " + fileName);
+            e.printStackTrace();
+        } catch (IOException e) {
+            Log.error("IOException: " + fileName);
+            e.printStackTrace();
+        }
+
+        return pairList;
     }
 
 
