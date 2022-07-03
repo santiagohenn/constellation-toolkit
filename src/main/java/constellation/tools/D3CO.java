@@ -181,7 +181,13 @@ public class D3CO {
 
                 List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
 
-                double coverage = Geo.computeNonEuclideanSurface2(roiIntersection) / roiSurface;
+                double coverage;
+
+                if (roiIntersection != null) {
+                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection) / roiSurface;
+                } else {
+                    coverage = 0;
+                }
 
                 int nAssets = AAP.getnOfGwsInSight();
                 // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
@@ -401,7 +407,11 @@ public class D3CO {
             intersection = PolyBool.intersect(eps, polyA, polyB);
         }
 
-        return intersection.getRegions().get(0);
+        if (intersection.getRegions().size() > 0) {
+            return intersection.getRegions().get(0);
+        } else {
+            return null;
+        }
 
     }
 
