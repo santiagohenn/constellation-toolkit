@@ -208,7 +208,7 @@ public class D3CO {
 
         }
 
-        reportGenerator.saveAsCSV(statistics, "PercentageCoverage.csv");
+        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
     }
 
