@@ -66,7 +66,7 @@ public class Geo {
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
      **/
-    public static double computeNonEuclideanSurface(List<Pair> pairList) {
+    public static double computeNonEuclideanSurface(List<Pair> pairList) { // TODO: REMOVE IF 2 WORKS
 
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
