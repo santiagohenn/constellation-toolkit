@@ -171,33 +171,45 @@ public class D3CO {
         // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
         Map<Integer, Double> accumCoverage = new HashMap<>(MAX_SUBSET_SIZE);
 
+        List<AAP> roiIntersections = new ArrayList<>();
+
         while (pointerDate.compareTo(endDate) <= 0) {
 
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
             accumCoverage.clear();
 
-            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
-            AAPs.stream().filter(AAP -> AAP.getDate() == timeSinceStart).forEach(AAP -> {
+            long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+            AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
 
                 List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
 
                 double coverage;
 
-                if (roiIntersection != null) {
-                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection) / roiSurface;
-                } else {
+                if (roiIntersection.isEmpty()) {
                     coverage = 0;
-                }
-
-                int nAssets = AAP.getnOfGwsInSight();
-                // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
-                if (accumCoverage.containsKey(nAssets)) {
-                    accumCoverage.put(nAssets, accumCoverage.get(nAssets) + coverage);
                 } else {
-                    accumCoverage.put(nAssets, coverage);
-                }
-                AAP.setSurfaceInKm2(coverage);
+                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection);
 
+                    int nAssets = AAP.getnOfGwsInSight();
+                    // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+                    if (accumCoverage.containsKey(nAssets)) {
+                        accumCoverage.put(nAssets, accumCoverage.get(nAssets) + coverage);
+                    } else {
+                        accumCoverage.put(nAssets, coverage);
+                    }
+                    AAP.setSurfaceInKm2(coverage);
+
+                    // Save AAPs
+                    roiIntersections.add(new AAP(timeElapsed, AAP.getnOfGwsInSight(), AAP.getGwsInSight(), roiIntersection,
+                            roiIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            roiIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+                }
+
+            });
+
+            // Transform accumulated coverage into percentage
+            accumCoverage.keySet().forEach(nOfAssets -> {
+                accumCoverage.put(nOfAssets, accumCoverage.get(nOfAssets) / roiSurface);
             });
 
             // Save the results
@@ -208,6 +220,7 @@ public class D3CO {
 
         }
 
+        saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
         reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
     }
@@ -410,7 +423,7 @@ public class D3CO {
         if (intersection.getRegions().size() > 0) {
             return intersection.getRegions().get(0);
         } else {
-            return null;
+            return new ArrayList<>();
         }
 
     }
