@@ -171,6 +171,7 @@ public class D3CO {
         // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
         Map<Integer, Double> accumCoverage = new HashMap<>(MAX_SUBSET_SIZE);
 
+        List<AAP> roiIntersections2 = new ArrayList<>();
         List<AAP> roiIntersections = new ArrayList<>();
 
         while (pointerDate.compareTo(endDate) <= 0) {
@@ -179,49 +180,88 @@ public class D3CO {
             accumCoverage.clear();
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+
+            // Group regions by number of satellites on sight
+            Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
             AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
-
-                List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
-
-                double coverage;
-
-                if (roiIntersection.isEmpty()) {
-                    coverage = 0;
+                int nAssets = AAP.getnOfGwsInSight();
+                // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+                if (byAssetsInSight.containsKey(nAssets)) {
+                    byAssetsInSight.get(nAssets).add(AAP);
                 } else {
-                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection);
-
-                    int nAssets = AAP.getnOfGwsInSight();
-                    // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
-                    if (accumCoverage.containsKey(nAssets)) {
-                        accumCoverage.put(nAssets, accumCoverage.get(nAssets) + coverage);
-                    } else {
-                        accumCoverage.put(nAssets, coverage);
-                    }
-                    AAP.setSurfaceInKm2(coverage);
-
-                    // Save AAPs
-                    roiIntersections.add(new AAP(timeElapsed, AAP.getnOfGwsInSight(), AAP.getGwsInSight(), roiIntersection,
-                            roiIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            roiIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+                    List<AAP> aapList = new ArrayList<>();
+                    aapList.add(AAP);
+                    byAssetsInSight.put(nAssets, aapList);
                 }
-
             });
+
+            Log.debug("byAssetsInSight length: " + byAssetsInSight.size());
+
+            // Calculate intersection of AAPs with the ROI
+            // Map<Integer, List<AAP>> roiIntersections = new LinkedHashMap<>(MAX_SUBSET_SIZE);
+
+            byAssetsInSight.forEach((key, value) -> {
+                value.forEach(aap -> {
+                    List<double[]> intersection = intersectAndGetPolygon(ROI, aap.getNonEuclideanCoordinates());
+
+                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
+                            intersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            intersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                    roiIntersections.add(intersectionAAP);
+                    Log.debug("intersection for : " + key + " sats: " + intersection.size() + " at " + timeElapsed + " roi intersection size: " + roiIntersections.size());
+//                    if (roiIntersections.containsKey(key)) {
+//                        roiIntersections.get(key).add(intersectionAAP);
+//                    } else {
+//                        List<AAP> aapList = new ArrayList<>();
+//                        aapList.add(intersectionAAP);
+//                        roiIntersections.put(key, aapList);
+//                    }
+                });
+            });
+
+
+
+//                List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
+//
+//                double coverage;
+//
+//                if (roiIntersection.isEmpty()) {
+//                    coverage = 0;
+//                } else {
+//                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection);
+//
+//                    int nAssets = AAP.getnOfGwsInSight();
+//                    // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+//                    if (accumCoverage.containsKey(nAssets)) {
+//                        accumCoverage.put(nAssets, accumCoverage.get(nAssets) + coverage);
+//                    } else {
+//                        accumCoverage.put(nAssets, coverage);
+//                    }
+//                    AAP.setSurfaceInKm2(coverage);
+//
+//                    // Save AAPs
+//                    roiIntersections2.add(new AAP(timeElapsed, AAP.getnOfGwsInSight(), AAP.getGwsInSight(), roiIntersection,
+//                            roiIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+//                            roiIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+//                }
+//
+//            });
 
             // Transform accumulated coverage into percentage
-            accumCoverage.keySet().forEach(nOfAssets -> {
-                accumCoverage.put(nOfAssets, accumCoverage.get(nOfAssets) / roiSurface);
-            });
-
-            // Save the results
-            statistics.add(stringifyResults(pointerDate, accumCoverage));
+//            accumCoverage.keySet().forEach(nOfAssets -> {
+//                accumCoverage.put(nOfAssets, accumCoverage.get(nOfAssets) / roiSurface);
+//            });
+//
+//            // Save the results
+//            statistics.add(stringifyResults(pointerDate, accumCoverage));
 
             // Advance to the next time step
             pointerDate = pointerDate.shiftedBy(TIME_STEP);
 
         }
-
         saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
-        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
+
+//        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
     }
 
@@ -284,6 +324,10 @@ public class D3CO {
                 .collect(Collectors.toList()), fileName);
     }
 
+
+    /**
+     * Over the top progress bar mainly for debugging.
+     * **/
     private void updateProgressBar(double current, double total) {
 
         double progress = Math.round(current * 100 * 100.00 / total) / 100.00;
@@ -296,6 +340,10 @@ public class D3CO {
             System.out.print(":");
         }
         System.out.print(" " + (int) progress + " %");
+
+        if ((int) progress >= 100) {
+            System.out.println();
+        }
 
     }
 
@@ -397,6 +445,7 @@ public class D3CO {
         return 1;
     }
 
+    // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
     /**
      * This method takes two polygons, and returns their intersection according to the Martinez-Rueda Algorithm.
      *
@@ -422,6 +471,32 @@ public class D3CO {
 
         if (intersection.getRegions().size() > 0) {
             return intersection.getRegions().get(0);
+        } else {
+            return new ArrayList<>();
+        }
+
+    }
+
+    /**
+     * This method takes a polygon A and a list of polygons L, and returns a list of intersections between A and every
+     * member of L, using the Martinez-Rueda Algorithm.
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    private List<List<double[]>> intersectWithRegions(List<double[]> polygonA, List<List<double[]>> polygonList) {
+
+        List<List<double[]>> regions1 = new ArrayList<>();
+        regions1.add(polygonA);
+
+        Polygon polyA = new Polygon(regions1);
+        Polygon polyB = new Polygon(polygonList);
+        Polygon intersection = new Polygon();
+
+        if (polyA.getRegions().get(0).size() >= 3 && polygonList.size() > 0) {
+            Epsilon eps = epsilon();
+            intersection = PolyBool.intersect(eps, polyA, polyB);
+            return intersection.getRegions();
         } else {
             return new ArrayList<>();
         }
