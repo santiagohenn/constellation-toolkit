@@ -209,7 +209,7 @@ public class D3CO {
                 // For each AAP with this number of assets in sight
                 value.forEach(aap -> {
 
-                      //  With transformation
+                    //  With transformation
 //                            List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
 //                                    Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
 //                                            referenceLat, referenceLon));
@@ -235,9 +235,23 @@ public class D3CO {
                 });
             });
 
+            double[] percentageValues = new double[satelliteList.size()];
+
+            // remove intersections surfaces
+            for (int i = 0; i < surfaceValues.length - 1; i++) {
+                for (int j = i + 1; j < surfaceValues.length - 1; j++) {
+                    surfaceValues[i] = surfaceValues[i] - surfaceValues[j];
+                }
+            }
+
             // TODO REMOVE DEBUG
             for (double surface : surfaceValues) {
-                Log.info("Surface [km2]: " + surface);
+                Log.info("Surface [km2]: " + surface / 1e6);
+                Log.info("Diff with ROI: " + (roiSurface - surface));
+            }
+
+            for (double surface : surfaceValues) {
+                Log.info("Percentage [%]: " + (surface / roiSurface) * 100.00000);
             }
 
 //            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
@@ -504,6 +518,7 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
@@ -536,6 +551,7 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their union using the Martinez-Rueda Algorithm.
      *
