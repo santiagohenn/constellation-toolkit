@@ -112,8 +112,6 @@ public class D3CO {
 
                     List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
 
-//                    polygonsToIntersect.stream().skip(0).forEach(poly -> intersectAndGetPolygon(intersectedPolygon, poly));
-
                     // Obtain access polygon
                     for (List<double[]> polygon : polygonsToIntersect) {
                         if (polygonsToIntersect.indexOf(polygon) == 0) continue;
@@ -167,17 +165,14 @@ public class D3CO {
         double referenceLat = -90;
         double referenceLon = 0;
 
-        List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
+        // FIXME: use euclidean interception! I'm just testing this!
+        List<double[]> euclideanROI = nonEuclideanROI; //Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
 
-        euclideanROI.forEach(p -> {
-            System.out.println(p[0] + "," + p[1]);
-        });
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate pointerDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
-
 
         // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
         Map<Integer, Double> accumCoverage = new HashMap<>(MAX_SUBSET_SIZE);
@@ -206,18 +201,22 @@ public class D3CO {
                 }
             });
 
-            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
-            byAssetsInSight.forEach((key, value) -> {
-                List<List<double[]>> toBeOR = new ArrayList<>();
-                // intersect for each number of sats
-                value.forEach(aap -> {
-                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
-                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
-                                    referenceLat, referenceLon));
+            double[] surfaceValues = new double[satelliteList.size()];
 
-                    if (intersection.size() >= 3) {
-                        toBeOR.add(intersection);
-                    }
+            // Perform intersection of AAPs with the ROI and surface area values calculation
+            // For each number of assets
+            byAssetsInSight.forEach((key, value) -> {
+                // For each AAP with this number of assets in sight
+                value.forEach(aap -> {
+
+                      //  With transformation
+//                            List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
+//                                    Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
+//                                            referenceLat, referenceLon));
+
+                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI, aap.getNonEuclideanCoordinates());
+
+                    surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(intersection);
 
                     // FIXME Might need to move this up
                     AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
@@ -234,35 +233,70 @@ public class D3CO {
 //                        roiIntersections.put(key, aapList);
 //                    }
                 });
-
-                Log.debug("To be or: " + toBeOR.size());
-                List<List<double[]>> union = new ArrayList<>();
-
-                try {
-                    union = polyUnion(euclideanROI, toBeOR);
-                } catch (IndexOutOfBoundsException e) {
-                    Log.error("----ERROR----");
-                    Log.error(e.getMessage());
-                    toBeOR.forEach(poly -> Log.error("size: " + poly.size()));
-                    Log.error("-------------");
-                }
-
-                double areaCovered = 0;
-                for (List<double[]> poly : union) {
-                    areaCovered = areaCovered + Geo.computeNonEuclideanSurface2(Transformations.toNonEuclideanPlane(poly, referenceLat, referenceLon));
-
-                    // TODO: REMOVE THIS DEBUG
-                    AAP orAAP = new AAP(timeElapsed, key, null, poly,
-                            poly.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            poly.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                    roiIntersections2.add(orAAP);
-
-                }
-                Log.debug("surface union: " + (areaCovered));
-                Log.debug("surface roi: " + (roiSurface));
-                Log.info("coverage: " + (areaCovered / roiSurface) * 100.0 + " %");
-
             });
+
+            // TODO REMOVE DEBUG
+            for (double surface : surfaceValues) {
+                Log.info("Surface [km2]: " + surface);
+            }
+
+//            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
+//            byAssetsInSight.forEach((key, value) -> {
+//                List<List<double[]>> toBeOR = new ArrayList<>();
+//                // intersect for each number of sats
+//                value.forEach(aap -> {
+//                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
+//                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
+//                                    referenceLat, referenceLon));
+//
+//                    if (intersection.size() >= 3) {
+//                        toBeOR.add(intersection);
+//                    }
+//
+//                    // FIXME Might need to move this up
+//                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
+//                            intersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+//                            intersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+//                    roiIntersections.add(intersectionAAP);
+//                    Log.debug("intersection for : " + key + " sats: " + intersection.size() + " at " + timeElapsed + " roi intersection size: " + roiIntersections.size());
+//
+////                    if (roiIntersections.containsKey(key)) {
+////                        roiIntersections.get(key).add(intersectionAAP);
+////                    } else {
+////                        List<AAP> aapList = new ArrayList<>();
+////                        aapList.add(intersectionAAP);
+////                        roiIntersections.put(key, aapList);
+////                    }
+//                });
+//
+//                Log.debug("To be or size: " + toBeOR.size());
+//                List<List<double[]>> union = new ArrayList<>();
+//
+//                try {
+//                    union = polyUnion(euclideanROI, toBeOR);
+//                } catch (IndexOutOfBoundsException e) {
+//                    Log.error("----ERROR----");
+//                    Log.error(e.getMessage());
+//                    toBeOR.forEach(poly -> Log.error("size: " + poly.size()));
+//                    Log.error("-------------");
+//                }
+//
+//                double areaCovered = 0;
+//                for (List<double[]> poly : union) {
+//                    areaCovered = areaCovered + Geo.computeNonEuclideanSurface2(Transformations.toNonEuclideanPlane(poly, referenceLat, referenceLon));
+//
+//                    // TODO: REMOVE THIS DEBUG
+//                    AAP orAAP = new AAP(timeElapsed, key, null, poly,
+//                            poly.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+//                            poly.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+//                    roiIntersections2.add(orAAP);
+//
+//                }
+//                Log.debug("surface union: " + (areaCovered));
+//                Log.debug("surface roi: " + (roiSurface));
+//                Log.info("coverage: " + (areaCovered / roiSurface) * 100.0 + " %");
+//
+//            });
 
 
 //                List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
@@ -304,7 +338,7 @@ public class D3CO {
 
         }
         saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
-        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
+//        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
 
 //        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
@@ -470,9 +504,8 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
     /**
-     * This method takes two polygons, and returns their intersection according to the Martinez-Rueda Algorithm.
+     * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
      * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
      * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
@@ -502,36 +535,92 @@ public class D3CO {
 
     }
 
+    // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
     /**
-     * This method takes a polygon and a polygon list and returns the union using the Martinez-Rueda Algorithm.
+     * This method takes two polygons, and returns their union using the Martinez-Rueda Algorithm.
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    private List<double[]> uniteAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
+
+        List<List<double[]>> regions1 = new ArrayList<>();
+        regions1.add(polygonA);
+
+        List<List<double[]>> regions2 = new ArrayList<>();
+        regions2.add(polygonB);
+
+        Polygon polyA = new Polygon(regions1);
+        Polygon polyB = new Polygon(regions2);
+        Polygon union = new Polygon();
+
+        if (polyA.getRegions().get(0).size() >= 3 && polyB.getRegions().get(0).size() >= 3) {
+            Epsilon eps = epsilon();
+            union = PolyBool.union(eps, polyA, polyB);
+        }
+
+        if (union.getRegions().size() > 0) {
+            return union.getRegions().get(0);
+        } else {
+            return new ArrayList<>();
+        }
+
+    }
+
+    /**
+     * This method takes a polygon (A) and a polygon list and returns the unions between A and each polygon in the list.
      *
      * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
      * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
      **/
     private List<List<double[]>> polyUnion(List<double[]> polygonA, List<List<double[]>> polygonList) {
 
-        List<List<double[]>> roi = new ArrayList<>();
-        roi.add(polygonA);
+        List<List<double[]>> unionsList = new ArrayList<>();
 
+//        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
+//
+//        // Obtain access polygon
+//        for (List<double[]> polygon : polygonsToIntersect) {
+//            if (polygonsToIntersect.indexOf(polygon) == 0) continue;
+//            intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
+//        }
+
+        // ROI
+        List<List<double[]>> roi = new ArrayList<>();
+        List<List<double[]>> aap = new ArrayList<>();
+        roi.add(polygonA);
         Polygon polyA = new Polygon(roi);
-        Polygon polyB = new Polygon(polygonList);
 
         Epsilon eps = epsilon();
-        Polygon union = new Polygon();
+        Polygon union;
 
-        try {
-            union = PolyBool.union(eps, polyA, polyB);
-        } catch (RuntimeException e) {
-            Log.error(e.getMessage());
-            polygonList.forEach(poly -> {
-                Log.error("---- POLYGON \\/ ----");
-                poly.forEach(pair -> {
-                    Log.error(pair[0] + "," + pair[1]);
+        for (List<double[]> polygon : polygonList) {
+
+            aap.clear();
+            aap.add(polygon);
+            Polygon polyB = new Polygon(aap);
+
+            try {
+                union = PolyBool.union(eps, polyA, polyB);
+
+                if (union.getRegions().size() > 0) {
+                    unionsList.add(union.getRegions().get(0));
+                }
+
+            } catch (RuntimeException e) {
+                Log.error(e.getMessage());
+                polygonList.forEach(poly -> {
+                    Log.error("POLYGON SIZE: " + poly.size());
+//                    poly.forEach(pair -> {
+//                        Log.error(pair[0] + "," + pair[1]);
+//                    });
                 });
-            });
+            }
+
         }
 
-        return union.getRegions();
+
+        return unionsList;
 
     }
 
