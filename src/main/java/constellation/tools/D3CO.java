@@ -159,14 +159,25 @@ public class D3CO {
         statistics.clear();
 
         // Load ROI Data:
-        List<double[]> ROI = Geo.file2DoubleList("roi.csv");
-        double roiSurface = Geo.computeNonEuclideanSurface2(ROI);
-        Log.debug("Area of ROI in Km2: " + roiSurface/1e6);
+        List<double[]> nonEuclideanROI = Geo.file2DoubleList("roi.csv");
+        double roiSurface = Geo.computeNonEuclideanSurface2(nonEuclideanROI);
+        Log.debug("Area of ROI in Km2: " + roiSurface / 1e6);
 
+        // TODO: Generalize for any ROI
+        double referenceLat = -90;
+        double referenceLon = 0;
+
+        List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
+
+        euclideanROI.forEach(p -> {
+            System.out.println(p[0] + "," + p[1]);
+        });
+        // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate pointerDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
+
 
         // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
         Map<Integer, Double> accumCoverage = new HashMap<>(MAX_SUBSET_SIZE);
@@ -181,7 +192,7 @@ public class D3CO {
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
-            // Group regions by number of satellites on sight
+            // Group regions by number of satellites on sight, for this particular timestep
             Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
             AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
                 int nAssets = AAP.getnOfGwsInSight();
@@ -195,20 +206,26 @@ public class D3CO {
                 }
             });
 
-            Log.debug("byAssetsInSight length: " + byAssetsInSight.size());
-
-            // Calculate intersection of AAPs with the ROI
-            // Map<Integer, List<AAP>> roiIntersections = new LinkedHashMap<>(MAX_SUBSET_SIZE);
-
+            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
             byAssetsInSight.forEach((key, value) -> {
+                List<List<double[]>> toBeOR = new ArrayList<>();
+                // intersect for each number of sats
                 value.forEach(aap -> {
-                    List<double[]> intersection = intersectAndGetPolygon(ROI, aap.getNonEuclideanCoordinates());
+                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
+                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
+                                    referenceLat, referenceLon));
 
+                    if (intersection.size() >= 3) {
+                        toBeOR.add(intersection);
+                    }
+
+                    // FIXME Might need to move this up
                     AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
                             intersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                             intersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
                     roiIntersections.add(intersectionAAP);
                     Log.debug("intersection for : " + key + " sats: " + intersection.size() + " at " + timeElapsed + " roi intersection size: " + roiIntersections.size());
+
 //                    if (roiIntersections.containsKey(key)) {
 //                        roiIntersections.get(key).add(intersectionAAP);
 //                    } else {
@@ -217,8 +234,35 @@ public class D3CO {
 //                        roiIntersections.put(key, aapList);
 //                    }
                 });
-            });
 
+                Log.debug("To be or: " + toBeOR.size());
+                List<List<double[]>> union = new ArrayList<>();
+
+                try {
+                    union = polyUnion(euclideanROI, toBeOR);
+                } catch (IndexOutOfBoundsException e) {
+                    Log.error("----ERROR----");
+                    Log.error(e.getMessage());
+                    toBeOR.forEach(poly -> Log.error("size: " + poly.size()));
+                    Log.error("-------------");
+                }
+
+                double areaCovered = 0;
+                for (List<double[]> poly : union) {
+                    areaCovered = areaCovered + Geo.computeNonEuclideanSurface2(Transformations.toNonEuclideanPlane(poly, referenceLat, referenceLon));
+
+                    // TODO: REMOVE THIS DEBUG
+                    AAP orAAP = new AAP(timeElapsed, key, null, poly,
+                            poly.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            poly.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                    roiIntersections2.add(orAAP);
+
+                }
+                Log.debug("surface union: " + (areaCovered));
+                Log.debug("surface roi: " + (roiSurface));
+                Log.info("coverage: " + (areaCovered / roiSurface) * 100.0 + " %");
+
+            });
 
 
 //                List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
@@ -260,6 +304,7 @@ public class D3CO {
 
         }
         saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
+        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
 
 //        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
@@ -322,29 +367,6 @@ public class D3CO {
         reportGenerator.saveAsJSON(AAPs.stream()
                 .filter(AAP -> AAP.getDate() == time)
                 .collect(Collectors.toList()), fileName);
-    }
-
-
-    /**
-     * Over the top progress bar mainly for debugging.
-     * **/
-    private void updateProgressBar(double current, double total) {
-
-        double progress = Math.round(current * 100 * 100.00 / total) / 100.00;
-
-        // Progress bar
-        for (int i = 0; i < (int) progress; i++) {
-            System.out.print("\b");
-        }
-        for (int i = 1; i < (int) progress; i++) {
-            System.out.print(":");
-        }
-        System.out.print(" " + (int) progress + " %");
-
-        if ((int) progress >= 100) {
-            System.out.println();
-        }
-
     }
 
     // FIXME REPLACE WITH POST-ANALYSIS
@@ -443,9 +465,12 @@ public class D3CO {
             }
         }
         return 1;
+
+
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their intersection according to the Martinez-Rueda Algorithm.
      *
@@ -478,6 +503,39 @@ public class D3CO {
     }
 
     /**
+     * This method takes a polygon and a polygon list and returns the union using the Martinez-Rueda Algorithm.
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    private List<List<double[]>> polyUnion(List<double[]> polygonA, List<List<double[]>> polygonList) {
+
+        List<List<double[]>> roi = new ArrayList<>();
+        roi.add(polygonA);
+
+        Polygon polyA = new Polygon(roi);
+        Polygon polyB = new Polygon(polygonList);
+
+        Epsilon eps = epsilon();
+        Polygon union = new Polygon();
+
+        try {
+            union = PolyBool.union(eps, polyA, polyB);
+        } catch (RuntimeException e) {
+            Log.error(e.getMessage());
+            polygonList.forEach(poly -> {
+                Log.error("---- POLYGON \\/ ----");
+                poly.forEach(pair -> {
+                    Log.error(pair[0] + "," + pair[1]);
+                });
+            });
+        }
+
+        return union.getRegions();
+
+    }
+
+    /**
      * This method takes a polygon A and a list of polygons L, and returns a list of intersections between A and every
      * member of L, using the Martinez-Rueda Algorithm.
      *
@@ -499,6 +557,29 @@ public class D3CO {
             return intersection.getRegions();
         } else {
             return new ArrayList<>();
+        }
+
+    }
+
+
+    /**
+     * Over the top progress bar mainly for debugging.
+     **/
+    private void updateProgressBar(double current, double total) {
+
+        double progress = Math.round(current * 100 * 100.00 / total) / 100.00;
+
+        // Progress bar
+        for (int i = 0; i < (int) progress; i++) {
+            System.out.print("\b");
+        }
+        for (int i = 1; i < (int) progress; i++) {
+            System.out.print(":");
+        }
+        System.out.print(" " + (int) progress + " %");
+
+        if ((int) progress >= 100) {
+            System.out.println();
         }
 
     }
