@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
+import static com.menecats.polybool.helpers.PolyBoolHelper.polygon;
 
 /**
  * Dynamic Constellation Coverage Computer (D3CO)
@@ -187,6 +188,8 @@ public class D3CO {
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
+            Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
+
             // Group regions by number of satellites on sight, for this particular timestep
             Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
             AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
@@ -217,8 +220,10 @@ public class D3CO {
                             Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
                                     referenceLat, referenceLon));
 
-                    toBeOr.add(eIntersection);
-
+                    if (eIntersection.size() >= 3) {
+                        // Collections.reverse(eIntersection);
+                        toBeOr.add(eIntersection);
+                    }
                     List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
 
                     surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
@@ -231,27 +236,33 @@ public class D3CO {
                 });
 
                 // Union of all ROI intersections
-                Polygon polygon = new Polygon(toBeOr);
-                Epsilon eps = epsilon();
-
                 try {
-                    Polygon union = PolyBool.union(eps, new Polygon(), polygon);
 
+                    Epsilon eps = epsilon();
+                    Polygon result = polygon(toBeOr.get(0));
+                    PolyBool.Segments segments = PolyBool.segments(eps, result);
+                    for (int i = 1; i < toBeOr.size(); i++) {
+                        PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(toBeOr.get(i)));
+                        PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                        segments = PolyBool.selectUnion(comb);
+                    }
+
+                    Polygon union = PolyBool.polygon(eps, segments);
                     union.getRegions().forEach(region -> {
 
                         List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-
                         surfaceValuesU[key - 1] = surfaceValuesU[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-
                         AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
                                 neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                                 neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
                         roiIntersections2.add(unionAAP);
-
                     });
                 } catch (IndexOutOfBoundsException e) {
                     Log.error(e.getMessage());
-                    Log.error("toBeOr size: " + toBeOr.size());
+                    Log.error("polygons to be or list size: " + toBeOr.size());
+                    toBeOr.forEach(region -> {
+                        Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
+                    });
                 }
 
             });
@@ -269,12 +280,12 @@ public class D3CO {
             Log.info("----------------------------------");
             Log.info("Surface values with intersection: ");
             for (double surface : surfaceValues) {
-                Log.info("Normalized surface [km2]: " + surface + " => " + (surface / roiSurface) * 100.00000 + "% Coverage");
+                Log.info("Normalized surface [km2]: " + surface + " => " + ((double) Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d) + "% Coverage");
             }
             Log.info("----------------------------------");
             Log.info("Surface values with union: ");
             for (double surface : surfaceValuesU) {
-                Log.info("Normalized surface [km2]: " + surface + " => " + (surface / roiSurface) * 100.00000 + "% Coverage");
+                Log.info("Normalized surface [km2]: " + surface + " => " + ((double) Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d) + "% Coverage");
             }
             Log.info("----------------------------------");
 
@@ -376,7 +387,7 @@ public class D3CO {
 
         }
         saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
-//        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
+        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
 
 //        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
 
@@ -705,7 +716,7 @@ public class D3CO {
         for (int i = 1; i < (int) progress; i++) {
             System.out.print(":");
         }
-        System.out.print(" " + (int) progress + " %");
+        System.out.print(" " + (int) progress + " % ");
 
         if ((int) progress >= 100) {
             System.out.println();
