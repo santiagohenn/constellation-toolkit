@@ -166,7 +166,7 @@ public class D3CO {
         double referenceLon = 0;
 
         // FIXME: use euclidean interception! I'm just testing this!
-        List<double[]> euclideanROI = nonEuclideanROI; //Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
+        List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon); //nonEuclideanROI; //
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -202,45 +202,61 @@ public class D3CO {
             });
 
             double[] surfaceValues = new double[satelliteList.size()];
+            double[] surfaceValuesU = new double[satelliteList.size()];
 
             // Perform intersection of AAPs with the ROI and surface area values calculation
             // For each number of assets
             byAssetsInSight.forEach((key, value) -> {
+
+                List<List<double[]>> toBeOr = new ArrayList<>();
+
                 // For each AAP with this number of assets in sight
                 value.forEach(aap -> {
+                    // Intersections with ROI
+                    List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI,
+                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
+                                    referenceLat, referenceLon));
 
-                    //  With transformation
-//                            List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
-//                                    Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
-//                                            referenceLat, referenceLon));
+                    toBeOr.add(eIntersection);
 
-                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI, aap.getNonEuclideanCoordinates());
+                    List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
 
-                    surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(intersection);
+                    surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
 
-                    // FIXME Might need to move this up
-                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
-                            intersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            intersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), neIntersection,
+                            neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
                     roiIntersections.add(intersectionAAP);
-                    Log.debug("intersection for : " + key + " sats: " + intersection.size() + " at " + timeElapsed + " roi intersection size: " + roiIntersections.size());
 
-//                    if (roiIntersections.containsKey(key)) {
-//                        roiIntersections.get(key).add(intersectionAAP);
-//                    } else {
-//                        List<AAP> aapList = new ArrayList<>();
-//                        aapList.add(intersectionAAP);
-//                        roiIntersections.put(key, aapList);
-//                    }
                 });
+
+                // Union of all ROI intersections
+                Polygon polygon = new Polygon(toBeOr);
+                Epsilon eps = epsilon();
+
+                try {
+                    Polygon union = PolyBool.union(eps, new Polygon(), polygon);
+
+                    union.getRegions().forEach(region -> {
+
+                        List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+
+                        surfaceValuesU[key - 1] = surfaceValuesU[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+
+                        AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
+                                neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                        roiIntersections2.add(unionAAP);
+
+                    });
+                } catch (IndexOutOfBoundsException e) {
+                    Log.error(e.getMessage());
+                    Log.error("toBeOr size: " + toBeOr.size());
+                }
+
             });
 
-            double[] percentageValues = new double[satelliteList.size()];
-
-            // TODO REMOVE DEBUG
-            for (double surface : surfaceValues) {
-                Log.info("Total surface [km2]: " + surface);
-            }
+//            double[] percentageValues = new double[satelliteList.size()];
 
             // remove intersections surfaces
             for (int i = 0; i < surfaceValues.length - 1; i++) {
@@ -250,14 +266,17 @@ public class D3CO {
             }
 
             // TODO REMOVE DEBUG
+            Log.info("----------------------------------");
+            Log.info("Surface values with intersection: ");
             for (double surface : surfaceValues) {
-                Log.info("Normalized surface [km2]: " + surface);
-                //Log.info("Diff with ROI: " + Math.abs(roiSurface - surface));  // FIXME What is happeninnngggg
+                Log.info("Normalized surface [km2]: " + surface + " => " + (surface / roiSurface) * 100.00000 + "% Coverage");
             }
-
-            for (double surface : surfaceValues) {
-                Log.info("Percentage [%]: " + (surface / roiSurface) * 100.00000);
+            Log.info("----------------------------------");
+            Log.info("Surface values with union: ");
+            for (double surface : surfaceValuesU) {
+                Log.info("Normalized surface [km2]: " + surface + " => " + (surface / roiSurface) * 100.00000 + "% Coverage");
             }
+            Log.info("----------------------------------");
 
 //            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
 //            byAssetsInSight.forEach((key, value) -> {
