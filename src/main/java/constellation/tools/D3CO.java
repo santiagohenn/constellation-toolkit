@@ -7,7 +7,6 @@ import constellation.tools.geometry.AAP;
 import constellation.tools.geometry.FOV;
 import constellation.tools.geometry.Geo;
 import constellation.tools.math.Combination;
-import constellation.tools.math.Pair;
 import constellation.tools.math.Transformations;
 import constellation.tools.output.ReportGenerator;
 import org.orekit.time.AbsoluteDate;
@@ -35,6 +34,7 @@ public class D3CO {
     private final double TIME_STEP = Double.parseDouble((String) prop.get("time_step"));
     private final String OUTPUT_PATH = (String) prop.get("output_path");
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
+    private final String ROI_PATH = (String) prop.get("roi_path");
     private final boolean DEBUG = Boolean.parseBoolean((String) prop.get("debug_mode"));
     private final long SNAPSHOT = Long.parseLong((String) prop.get("snapshot"));
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
@@ -157,7 +157,7 @@ public class D3CO {
         statistics.clear();
 
         // Load ROI Data:
-        List<double[]> nonEuclideanROI = Geo.file2DoubleList("roi.csv");
+        List<double[]> nonEuclideanROI = Geo.file2DoubleList(ROI_PATH);
         double roiSurface = Geo.computeNonEuclideanSurface2(nonEuclideanROI);
         Log.debug("Area of ROI in Km2: " + roiSurface / 1e6);
 
@@ -237,17 +237,22 @@ public class D3CO {
 
             double[] percentageValues = new double[satelliteList.size()];
 
+            // TODO REMOVE DEBUG
+            for (double surface : surfaceValues) {
+                Log.info("Total surface [km2]: " + surface);
+            }
+
             // remove intersections surfaces
             for (int i = 0; i < surfaceValues.length - 1; i++) {
-                for (int j = i + 1; j < surfaceValues.length - 1; j++) {
+                for (int j = i + 1; j < surfaceValues.length; j++) {
                     surfaceValues[i] = surfaceValues[i] - surfaceValues[j];
                 }
             }
 
             // TODO REMOVE DEBUG
             for (double surface : surfaceValues) {
-                Log.info("Surface [km2]: " + surface / 1e6);
-                Log.info("Diff with ROI: " + (roiSurface - surface));
+                Log.info("Normalized surface [km2]: " + surface);
+                //Log.info("Diff with ROI: " + Math.abs(roiSurface - surface));  // FIXME What is happeninnngggg
             }
 
             for (double surface : surfaceValues) {
