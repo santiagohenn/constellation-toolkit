@@ -167,7 +167,7 @@ public class D3CO {
         double referenceLon = 0;
 
         // FIXME: use euclidean interception! I'm just testing this!
-        List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon); //nonEuclideanROI; //
+        List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -175,16 +175,12 @@ public class D3CO {
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
 
-        // Accumulated areas by number of satellites in visibility is stored in this array (idx = number of sats, value = area) // FIXME remove eventually
-        Map<Integer, Double> accumCoverage = new HashMap<>(MAX_SUBSET_SIZE);
-
-        List<AAP> roiIntersections2 = new ArrayList<>();
         List<AAP> roiIntersections = new ArrayList<>();
+        List<AAP> roiUnions = new ArrayList<>();
 
         while (pointerDate.compareTo(endDate) <= 0) {
 
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
-            accumCoverage.clear();
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
@@ -205,7 +201,6 @@ public class D3CO {
             });
 
             double[] surfaceValues = new double[satelliteList.size()];
-            double[] surfaceValuesU = new double[satelliteList.size()];
 
             // Perform intersection of AAPs with the ROI and surface area values calculation
             // For each number of assets
@@ -226,7 +221,7 @@ public class D3CO {
                     }
                     List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
 
-                    surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+                    // surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
 
                     AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), neIntersection,
                             neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
@@ -238,7 +233,7 @@ public class D3CO {
                 // Union of all ROI intersections
                 try {
 
-                    Epsilon eps = epsilon();
+                    Epsilon eps = epsilon(1e-10);
                     Polygon result = polygon(toBeOr.get(0));
                     PolyBool.Segments segments = PolyBool.segments(eps, result);
                     for (int i = 1; i < toBeOr.size(); i++) {
@@ -251,15 +246,21 @@ public class D3CO {
                     union.getRegions().forEach(region -> {
 
                         List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                        surfaceValuesU[key - 1] = surfaceValuesU[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+                        surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
                         AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
                                 neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                                 neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                        roiIntersections2.add(unionAAP);
+                        roiUnions.add(unionAAP);
                     });
-                } catch (IndexOutOfBoundsException e) {
-                    Log.error(e.getMessage());
+                } catch (IndexOutOfBoundsException e1) {
+                    Log.error("IndexOutOfBoundsException " + e1.getMessage());
                     Log.error("polygons to be or list size: " + toBeOr.size());
+                    toBeOr.forEach(region -> {
+                        Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
+                    });
+                } catch (RuntimeException e2) {
+                    Log.error(e2.getMessage());
+                    Log.error("RuntimeException " + toBeOr.size());
                     toBeOr.forEach(region -> {
                         Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
                     });
@@ -267,129 +268,25 @@ public class D3CO {
 
             });
 
-//            double[] percentageValues = new double[satelliteList.size()];
+            StringBuilder sb = new StringBuilder(timeElapsed + "");
 
-            // remove intersections surfaces
-            for (int i = 0; i < surfaceValues.length - 1; i++) {
-                for (int j = i + 1; j < surfaceValues.length; j++) {
-                    surfaceValues[i] = surfaceValues[i] - surfaceValues[j];
-                }
-            }
-
-            // TODO REMOVE DEBUG
-            Log.info("----------------------------------");
-            Log.info("Surface values with intersection: ");
             for (double surface : surfaceValues) {
-                Log.info("Normalized surface [km2]: " + surface + " => " + ((double) Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d) + "% Coverage");
+                sb.append(",");
+                double percentage = Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
+                sb.append(percentage);
+                Log.debug("Normalized surface [km2]: " + surface + " => " + percentage + "% Coverage");
             }
-            Log.info("----------------------------------");
-            Log.info("Surface values with union: ");
-            for (double surface : surfaceValuesU) {
-                Log.info("Normalized surface [km2]: " + surface + " => " + ((double) Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d) + "% Coverage");
-            }
-            Log.info("----------------------------------");
 
-//            // Transform to euclidean plane and calculate intersection of AAPs with the ROI
-//            byAssetsInSight.forEach((key, value) -> {
-//                List<List<double[]>> toBeOR = new ArrayList<>();
-//                // intersect for each number of sats
-//                value.forEach(aap -> {
-//                    List<double[]> intersection = intersectAndGetPolygon(euclideanROI,
-//                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
-//                                    referenceLat, referenceLon));
-//
-//                    if (intersection.size() >= 3) {
-//                        toBeOR.add(intersection);
-//                    }
-//
-//                    // FIXME Might need to move this up
-//                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), intersection,
-//                            intersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-//                            intersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-//                    roiIntersections.add(intersectionAAP);
-//                    Log.debug("intersection for : " + key + " sats: " + intersection.size() + " at " + timeElapsed + " roi intersection size: " + roiIntersections.size());
-//
-////                    if (roiIntersections.containsKey(key)) {
-////                        roiIntersections.get(key).add(intersectionAAP);
-////                    } else {
-////                        List<AAP> aapList = new ArrayList<>();
-////                        aapList.add(intersectionAAP);
-////                        roiIntersections.put(key, aapList);
-////                    }
-//                });
-//
-//                Log.debug("To be or size: " + toBeOR.size());
-//                List<List<double[]>> union = new ArrayList<>();
-//
-//                try {
-//                    union = polyUnion(euclideanROI, toBeOR);
-//                } catch (IndexOutOfBoundsException e) {
-//                    Log.error("----ERROR----");
-//                    Log.error(e.getMessage());
-//                    toBeOR.forEach(poly -> Log.error("size: " + poly.size()));
-//                    Log.error("-------------");
-//                }
-//
-//                double areaCovered = 0;
-//                for (List<double[]> poly : union) {
-//                    areaCovered = areaCovered + Geo.computeNonEuclideanSurface2(Transformations.toNonEuclideanPlane(poly, referenceLat, referenceLon));
-//
-//                    // TODO: REMOVE THIS DEBUG
-//                    AAP orAAP = new AAP(timeElapsed, key, null, poly,
-//                            poly.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-//                            poly.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-//                    roiIntersections2.add(orAAP);
-//
-//                }
-//                Log.debug("surface union: " + (areaCovered));
-//                Log.debug("surface roi: " + (roiSurface));
-//                Log.info("coverage: " + (areaCovered / roiSurface) * 100.0 + " %");
-//
-//            });
+            statistics.add(sb.toString());
 
-
-//                List<double[]> roiIntersection = intersectAndGetPolygon(ROI, AAP.getNonEuclideanCoordinates());
-//
-//                double coverage;
-//
-//                if (roiIntersection.isEmpty()) {
-//                    coverage = 0;
-//                } else {
-//                    coverage = Geo.computeNonEuclideanSurface2(roiIntersection);
-//
-//                    int nAssets = AAP.getnOfGwsInSight();
-//                    // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
-//                    if (accumCoverage.containsKey(nAssets)) {
-//                        accumCoverage.put(nAssets, accumCoverage.get(nAssets) + coverage);
-//                    } else {
-//                        accumCoverage.put(nAssets, coverage);
-//                    }
-//                    AAP.setSurfaceInKm2(coverage);
-//
-//                    // Save AAPs
-//                    roiIntersections2.add(new AAP(timeElapsed, AAP.getnOfGwsInSight(), AAP.getGwsInSight(), roiIntersection,
-//                            roiIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-//                            roiIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList())));
-//                }
-//
-//            });
-
-            // Transform accumulated coverage into percentage
-//            accumCoverage.keySet().forEach(nOfAssets -> {
-//                accumCoverage.put(nOfAssets, accumCoverage.get(nOfAssets) / roiSurface);
-//            });
-//
-//            // Save the results
-//            statistics.add(stringifyResults(pointerDate, accumCoverage));
-
-            // Advance to the next time step
+            // Advance timestep
             pointerDate = pointerDate.shiftedBy(TIME_STEP);
 
         }
-        saveAAPsAt(roiIntersections, "RoiDebug", SNAPSHOT);
-        saveAAPsAt(roiIntersections2, "RoiDebug2", SNAPSHOT);
 
-//        reportGenerator.saveAsCSV(statistics, "PercentageCoverage");
+        saveAAPsAt(roiIntersections, "intersections_AAPs", SNAPSHOT);
+        saveAAPsAt(roiUnions, "union_AAPs", SNAPSHOT);
+        reportGenerator.saveAsCSV(statistics, "coverage");
 
     }
 
