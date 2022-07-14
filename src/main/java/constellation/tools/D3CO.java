@@ -230,40 +230,42 @@ public class D3CO {
 
                 });
 
-                // Union of all ROI intersections
-                try {
+                if (toBeOr.size() != 0) {
 
-                    Epsilon eps = epsilon(1e-10);
-                    Polygon result = polygon(toBeOr.get(0));
-                    PolyBool.Segments segments = PolyBool.segments(eps, result);
-                    for (int i = 1; i < toBeOr.size(); i++) {
-                        PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(toBeOr.get(i)));
-                        PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
-                        segments = PolyBool.selectUnion(comb);
+                    // Union of all ROI intersections
+                    try {
+                        Epsilon eps = epsilon(0.0001);
+                        Polygon result = polygon(toBeOr.get(0));
+                        PolyBool.Segments segments = PolyBool.segments(eps, result);
+                        for (int i = 1; i < toBeOr.size(); i++) {
+                            PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(toBeOr.get(i)));
+                            PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                            segments = PolyBool.selectUnion(comb);
+                        }
+
+                        Polygon union = PolyBool.polygon(eps, segments);
+                        union.getRegions().forEach(region -> {
+
+                            List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+                            surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+                            AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
+                                    neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                    neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                            roiUnions.add(unionAAP);
+                        });
+                    } catch (IndexOutOfBoundsException e1) {
+                        Log.error("IndexOutOfBoundsException " + e1.getMessage());
+                        Log.error("polygons to be or list size: " + toBeOr.size());
+                        toBeOr.forEach(region -> {
+                            Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
+                        });
+                    } catch (RuntimeException e2) {
+                        Log.error(e2.getMessage());
+                        Log.error("RuntimeException " + toBeOr.size());
+                        toBeOr.forEach(region -> {
+                            Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
+                        });
                     }
-
-                    Polygon union = PolyBool.polygon(eps, segments);
-                    union.getRegions().forEach(region -> {
-
-                        List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                        surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-                        AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
-                                neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                                neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                        roiUnions.add(unionAAP);
-                    });
-                } catch (IndexOutOfBoundsException e1) {
-                    Log.error("IndexOutOfBoundsException " + e1.getMessage());
-                    Log.error("polygons to be or list size: " + toBeOr.size());
-                    toBeOr.forEach(region -> {
-                        Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
-                    });
-                } catch (RuntimeException e2) {
-                    Log.error(e2.getMessage());
-                    Log.error("RuntimeException " + toBeOr.size());
-                    toBeOr.forEach(region -> {
-                        Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
-                    });
                 }
 
             });
