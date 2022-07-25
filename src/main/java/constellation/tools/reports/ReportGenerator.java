@@ -1,4 +1,4 @@
-package constellation.tools.output;
+package constellation.tools.reports;
 
 import com.google.gson.Gson;
 

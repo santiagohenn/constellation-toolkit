@@ -3,7 +3,7 @@ package constellation.tools;
 import constellation.tools.geometry.ConstellationSSPs;
 import constellation.tools.geometry.FOV;
 import constellation.tools.math.Pair;
-import constellation.tools.output.ReportGenerator;
+import constellation.tools.reports.ReportGenerator;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
