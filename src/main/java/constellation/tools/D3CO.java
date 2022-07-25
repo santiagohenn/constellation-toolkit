@@ -47,6 +47,11 @@ public class D3CO {
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 
+    public static void main(String[] args) {
+        D3CO d3CO = new D3CO();
+        d3CO.run();
+    }
+
     /**
      * Default constructor
      **/
@@ -73,6 +78,7 @@ public class D3CO {
 
         double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
+        Log.debug("Computing AAPs");
         while (pointerDate.compareTo(endDate) <= 0) {
 
             long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
@@ -148,7 +154,8 @@ public class D3CO {
         saveAAPsAt(nonEuclideanAAPs, "NEPolygons_debug", SNAPSHOT);
         saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
 
-        analyzeSurfaceCoverage(nonEuclideanAAPs);
+//        analyzeSurfaceCoverage(nonEuclideanAAPs);
+        Log.debug("Computing ROI coverage");
         analyzeROICoverage(nonEuclideanAAPs);
 
     }
@@ -160,7 +167,6 @@ public class D3CO {
         // Load ROI Data:
         List<double[]> nonEuclideanROI = Geo.file2DoubleList(ROI_PATH);
         double roiSurface = Geo.computeNonEuclideanSurface2(nonEuclideanROI);
-        Log.debug("Area of ROI in Km2: " + roiSurface / 1e6);
 
         // TODO: Generalize for any ROI
         double referenceLat = -90;
@@ -184,7 +190,7 @@ public class D3CO {
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
-            Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
+//            Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
 
             // Group regions by number of satellites on sight, for this particular timestep
             Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
@@ -276,7 +282,6 @@ public class D3CO {
                 sb.append(",");
                 double percentage = Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
                 sb.append(percentage);
-                Log.debug("Normalized surface [km2]: " + surface + " => " + percentage + "% Coverage");
             }
 
             statistics.add(sb.toString());
