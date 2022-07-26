@@ -9,6 +9,8 @@ import constellation.tools.geometry.Geo;
 import constellation.tools.math.Combination;
 import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
+import me.tongfei.progressbar.ProgressBar;
+import me.tongfei.progressbar.ProgressBarStyle;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
@@ -49,6 +51,7 @@ public class D3CO {
     private final List<String> statistics = new ArrayList<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
+//    ProgressBar pb = new ProgressBar("Running", 100, ProgressBarStyle.ASCII);
 
     /**
      * Default constructor
@@ -64,7 +67,7 @@ public class D3CO {
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
-        AbsoluteDate pointerDate = startDate;
+//        AbsoluteDate pointerDate = startDate;
         double scenarioDuration = endDate.durationFrom(startDate);
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
@@ -77,76 +80,75 @@ public class D3CO {
         double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
         if (DEBUG_MODE) Log.debug("Computing AAPs");
-        while (pointerDate.compareTo(endDate) <= 0) {
+        try (ProgressBar pb = new ProgressBar("Obtaining AAPs", 100)) {
 
-            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
-            updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
+            pb.maxHint((long) scenarioDuration);
+            for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-            // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, pointerDate);
+                long timeSinceStart = Utils.stamp2unix(t.toString()) - Utils.stamp2unix(START_DATE);
+                pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
 
-            // double surfaceInKm = 0D;
+                // Obtain the starting non-euclidean FOVs and their surface value
+                List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, t);
 
-            for (List<Integer> combination : combinationsList) {
+                for (List<Integer> combination : combinationsList) {
 
-                List<double[]> nonEuclideanCoordinates = new ArrayList<>();
-                List<double[]> euclideanCoordinates = new ArrayList<>();
+                    List<double[]> nonEuclideanCoordinates = new ArrayList<>();
+                    List<double[]> euclideanCoordinates = new ArrayList<>();
 
-                // assemble a list of the FOVs to be intersected at this time step:
-                List<FOV> FOVsToIntersect = new ArrayList<>();
-                combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
+                    // assemble a list of the FOVs to be intersected at this time step:
+                    List<FOV> FOVsToIntersect = new ArrayList<>();
+                    combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
 
-                // Get reference point for the projection
-                int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
-                double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
-                double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
+                    // Get reference point for the projection
+                    int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
+                    double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
+                    double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
-                // If this is the immediate FOV for a single satellite
-                if (combination.size() <= 1) {
-                    int fovIdx = combination.get(0);
-                    FOV neFov = nonEuclideanFOVs.get(fovIdx);
-                    // nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates());
-                    nonEuclideanCoordinates = nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates();
-                    euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
-                            referenceLat, referenceLon);
+                    // If this is the immediate FOV for a single satellite
+                    if (combination.size() <= 1) {
+                        int fovIdx = combination.get(0);
+                        FOV neFov = nonEuclideanFOVs.get(fovIdx);
+                        // nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates());
+                        nonEuclideanCoordinates = nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates();
+                        euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
+                                referenceLat, referenceLon);
 
-                } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {
+                    } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {
 
-                    List<List<double[]>> polygonsToIntersect = new ArrayList<>();
-                    FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
+                        List<List<double[]>> polygonsToIntersect = new ArrayList<>();
+                        FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-                    List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
+                        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
 
-                    // Obtain access polygon
-                    for (List<double[]> polygon : polygonsToIntersect) {
-                        if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-                        intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
+                        // Obtain access polygon
+                        for (List<double[]> polygon : polygonsToIntersect) {
+                            if (polygonsToIntersect.indexOf(polygon) == 0) continue;
+                            intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
+                        }
+                        // Intersected polygon euclidean coordinates
+                        euclideanCoordinates = intersectedPolygon;
+
+                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersectedPolygon,
+                                referenceLat, referenceLon);
+
                     }
-                    // Intersected polygon euclidean coordinates
-                    euclideanCoordinates = intersectedPolygon;
 
-                    nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersectedPolygon,
-                            referenceLat, referenceLon);
+                    // Save AAPs
+                    nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, nonEuclideanCoordinates,
+                            nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+
+                    if (SAVE_EUCLIDEAN) {
+                        euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
+                                euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+                    }
 
                 }
-
-                // Save AAPs
-                nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, nonEuclideanCoordinates,
-                        nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                        nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
-
-                if (SAVE_EUCLIDEAN) {
-                    euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
-                            euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
-                }
-
             }
-
-            // Advance to the next time step
-            pointerDate = pointerDate.shiftedBy(TIME_STEP);
-
         }
+
 
         if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
         if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
@@ -184,75 +186,80 @@ public class D3CO {
         List<AAP> roiIntersections = new ArrayList<>();
         List<AAP> roiUnions = new ArrayList<>();
 
-        while (pointerDate.compareTo(endDate) <= 0) {
+        try (ProgressBar pb = new ProgressBar("ROI coverage", 100)) {
 
-            updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
+            pb.maxHint((long) scenarioDuration);
+            for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-            long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+                long timeSinceStart = Utils.stamp2unix(t.toString()) - Utils.stamp2unix(START_DATE);
+                pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
 
-            if (DEBUG_MODE) Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
+                long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
-            // Group regions by number of satellites on sight, for this particular time step
-            Map<Integer, List<AAP>> byAssetsInSight = mapByNOfAssets(AAPs, timeElapsed);
+                if (DEBUG_MODE) Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
 
-            double[] surfaceValues = new double[satelliteList.size()];
+                // Group regions by number of satellites on sight, for this particular time step
+                Map<Integer, List<AAP>> byAssetsInSight = mapByNOfAssets(AAPs, timeElapsed);
 
-            // Perform intersection of AAPs with the ROI and surface area values calculation
-            // For each number of assets
-            byAssetsInSight.forEach((k, aaps) -> {
+                double[] surfaceValues = new double[satelliteList.size()];
 
-                List<List<double[]>> unionQueue = new ArrayList<>();
+                // Perform intersection of AAPs with the ROI and surface area values calculation
+                // For each number of assets
+                byAssetsInSight.forEach((k, aaps) -> {
 
-                // For each AAP with this number of assets in sight
-                aaps.forEach(aap -> {
+                    List<List<double[]>> unionQueue = new ArrayList<>();
 
-                    // Intersections with ROI
-                    List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI,
-                            Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
-                                    referenceLat, referenceLon));
+                    // For each AAP with this number of assets in sight
+                    aaps.forEach(aap -> {
 
-                    if (eIntersection.size() >= 3) {
-                        // Collections.reverse(eIntersection);
-                        unionQueue.add(eIntersection);
+                        // Intersections with ROI
+                        List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI,
+                                Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
+                                        referenceLat, referenceLon));
+
+                        if (eIntersection.size() >= 3) {
+                            // Collections.reverse(eIntersection);
+                            unionQueue.add(eIntersection);
+                        }
+                        List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
+
+                        AAP intersectionAAP = new AAP(timeElapsed, k, aap.getGwsInSight(), neIntersection,
+                                neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                        roiIntersections.add(intersectionAAP);
+
+                    });
+
+                    if (!unionQueue.isEmpty()) {
+
+                        Polygon union = polyUnion(unionQueue);
+
+                        union.getRegions().forEach(region -> {
+                            List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+                            surfaceValues[k - 1] = surfaceValues[k - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+                            AAP unionAAP = new AAP(timeElapsed, k, null, neIntersection,
+                                    neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                    neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                            roiUnions.add(unionAAP);
+                        });
                     }
-                    List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
-
-                    AAP intersectionAAP = new AAP(timeElapsed, k, aap.getGwsInSight(), neIntersection,
-                            neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                    roiIntersections.add(intersectionAAP);
 
                 });
 
-                if (!unionQueue.isEmpty()) {
+                StringBuilder sb = new StringBuilder(timeElapsed + "");
 
-                    Polygon union = polyUnion(unionQueue);
-
-                    union.getRegions().forEach(region -> {
-                        List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                        surfaceValues[k - 1] = surfaceValues[k - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-                        AAP unionAAP = new AAP(timeElapsed, k, null, neIntersection,
-                                neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                                neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                        roiUnions.add(unionAAP);
-                    });
+                for (double surface : surfaceValues) {
+                    sb.append(",");
+                    double percentage = Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
+                    sb.append(percentage);
                 }
 
-            });
+                statistics.add(sb.toString());
 
-            StringBuilder sb = new StringBuilder(timeElapsed + "");
+                // Advance timestep
+                pointerDate = pointerDate.shiftedBy(TIME_STEP);
 
-            for (double surface : surfaceValues) {
-                sb.append(",");
-                double percentage = Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
-                sb.append(percentage);
             }
-
-            statistics.add(sb.toString());
-
-            // Advance timestep
-            pointerDate = pointerDate.shiftedBy(TIME_STEP);
-
         }
 
         saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
@@ -263,7 +270,7 @@ public class D3CO {
 
     /**
      * Performs the union of a list of polygons
-     * **/
+     **/
     private Polygon polyUnion(List<List<double[]>> unionQueue) {
 
         Polygon union = new Polygon();
@@ -478,6 +485,7 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
@@ -510,6 +518,7 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their union using the Martinez-Rueda Algorithm.
      *
@@ -613,27 +622,5 @@ public class D3CO {
 
     }
 
-
-    /**
-     * Over the top progress bar mainly for debugging.
-     **/
-    private void updateProgressBar(double current, double total) {
-
-        double progress = Math.round(current * 100 * 100.00 / total) / 100.00;
-
-        // Progress bar
-        for (int i = 0; i < (int) progress; i++) {
-            System.out.print("\b");
-        }
-        for (int i = 1; i < (int) progress; i++) {
-            System.out.print(":");
-        }
-        System.out.print(" " + (int) progress + " % ");
-
-        if ((int) progress >= 100) {
-            System.out.println();
-        }
-
-    }
 
 }
