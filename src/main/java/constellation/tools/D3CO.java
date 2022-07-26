@@ -208,7 +208,7 @@ public class D3CO {
 
                     // Intersections with ROI
                     List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI,
-                            Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
+                            Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
                                     referenceLat, referenceLon));
 
                     if (eIntersection.size() >= 3) {
@@ -335,7 +335,7 @@ public class D3CO {
             long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
             AAPs.stream().filter(AAP -> AAP.getDate() == timeSinceStart).forEach(AAP -> {
 
-                double surfaceInKm2 = Geo.computeNonEuclideanSurface2(AAP.getNonEuclideanCoordinates()) * 1E-6; // AAP.getSurfaceInKm2(); //
+                double surfaceInKm2 = Geo.computeNonEuclideanSurface2(AAP.getGeoCoordinates()) * 1E-6; // AAP.getSurfaceInKm2(); //
                 int nAssets = AAP.getnOfGwsInSight();
                 // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
                 if (accumulatedAreas.containsKey(nAssets)) {
