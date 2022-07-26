@@ -4,16 +4,16 @@ import java.util.List;
 
 public class FOV {
 
-    private final double referenceLat;
-    private final double referenceLon;
+    private final double sspLat;
+    private final double sspLon;
     private final int satId;
     private List<double[]> polygonCoordinates;
     private double surface;
 
     public FOV(int satId, double centerLat, double centerLong, List<double[]> polygon) {
         this.satId = satId;
-        this.referenceLat = centerLat;
-        this.referenceLon = centerLong;
+        this.sspLat = centerLat;
+        this.sspLon = centerLong;
         this.polygonCoordinates = polygon;
     }
 
@@ -29,12 +29,12 @@ public class FOV {
         return satId;
     }
 
-    public double getReferenceLat() {
-        return referenceLat;
+    public double getSspLat() {
+        return sspLat;
     }
 
-    public double getReferenceLon() {
-        return referenceLon;
+    public double getSspLon() {
+        return sspLon;
     }
 
     public double getSurfaceKm2() {

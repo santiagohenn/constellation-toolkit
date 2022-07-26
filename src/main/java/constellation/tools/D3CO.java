@@ -155,7 +155,6 @@ public class D3CO {
         if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "e_polygons_snapshot", SNAPSHOT);
 
 //        analyzeSurfaceCoverage(nonEuclideanAAPs);
-
         analyzeROICoverage(nonEuclideanAAPs);
 
     }
@@ -170,10 +169,10 @@ public class D3CO {
         double roiSurface = Geo.computeNonEuclideanSurface2(nonEuclideanROI);
 
         // TODO: Generalize for any ROI
+
         double referenceLat = -90;
         double referenceLon = 0;
 
-        // FIXME: use euclidean interception! I'm just testing this!
         List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
 
         // Timekeeping
@@ -228,8 +227,6 @@ public class D3CO {
                     }
                     List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
 
-                    // surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-
                     AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), neIntersection,
                             neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                             neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
@@ -252,7 +249,6 @@ public class D3CO {
 
                         Polygon union = PolyBool.polygon(eps, segments);
                         union.getRegions().forEach(region -> {
-
                             List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
                             surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
                             AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
@@ -459,7 +455,6 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
     /**
      * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
@@ -492,7 +487,6 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
     /**
      * This method takes two polygons, and returns their union using the Martinez-Rueda Algorithm.
      *
@@ -534,14 +528,6 @@ public class D3CO {
 
         List<List<double[]>> unionsList = new ArrayList<>();
 
-//        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
-//
-//        // Obtain access polygon
-//        for (List<double[]> polygon : polygonsToIntersect) {
-//            if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-//            intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
-//        }
-
         // ROI
         List<List<double[]>> roi = new ArrayList<>();
         List<List<double[]>> aap = new ArrayList<>();
@@ -568,9 +554,6 @@ public class D3CO {
                 Log.error(e.getMessage());
                 polygonList.forEach(poly -> {
                     Log.error("POLYGON SIZE: " + poly.size());
-//                    poly.forEach(pair -> {
-//                        Log.error(pair[0] + "," + pair[1]);
-//                    });
                 });
             }
 

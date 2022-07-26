@@ -51,7 +51,7 @@ public class SSPProp {
             // Store the SSPs (per Guido's request)
             List<Pair> SSPs = new ArrayList<>();
 
-            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getReferenceLat(), FOV.getReferenceLon())));
+            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getSspLat(), FOV.getSspLon())));
             constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
 
             // Advance to the next time step

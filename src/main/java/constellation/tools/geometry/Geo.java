@@ -26,9 +26,9 @@ public class Geo {
      **/
     public static int checkPoleInclusion(FOV FOV, double lambdaMax) {
 
-        if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
+        if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), 90, 0) <= lambdaMax) {
             return 1;
-        } else if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
+        } else if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), -90, 0) <= lambdaMax) {
             return -1;
         }
         return 0;
@@ -64,7 +64,7 @@ public class Geo {
      * @return Double the computed angular distance in degrees
      **/
     public static double computeGeodesic(FOV r1, FOV r2) {
-        return computeGeodesic(r1.getReferenceLat(), r1.getReferenceLon(), r2.getReferenceLat(), r2.getReferenceLon());
+        return computeGeodesic(r1.getSspLat(), r1.getSspLon(), r2.getSspLat(), r2.getSspLon());
     }
 
     /**

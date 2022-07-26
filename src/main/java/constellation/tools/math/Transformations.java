@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * This class holds mathematical and object transformations
- * **/
+ **/
 public class Transformations {
 
     private static Map<Double, Double> radii = new HashMap<>();
@@ -25,28 +25,36 @@ public class Transformations {
         final double referenceLatRads = Math.toRadians(referenceLat);
         final double referenceLonRads = Math.toRadians(referenceLon);
 
-        int segment = 0;
-
         for (double[] nePair : nonEuclideanPolygon) {
 
             double lat = Math.toRadians(nePair[0]);
             double lon = Math.toRadians(nePair[1]);
-            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-            if (USE_CONFORMAL_LATITUDE) localRadius = computeLocalRadius(lat);
 
-            double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
-                    Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-            double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
-            double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-            euclideanPolygon.add(new double[]{xStereo, yStereo});
-
-            radii.put(yStereo, localRadius);
+            euclideanPolygon.add(toStereo(lat, lon, referenceLatRads, referenceLonRads));
 
         }
 
         return euclideanPolygon;
+
+    }
+
+    /**
+     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
+     **/
+    public static double[] toStereo(double lat, double lon, double referenceLatRads, double referenceLonRads) {
+
+        double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+        if (USE_CONFORMAL_LATITUDE) localRadius = computeLocalRadius(lat);
+
+        double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
+                Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+        double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
+        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+        if (USE_CONFORMAL_LATITUDE) radii.put(yStereo, localRadius);
+
+        return new double[]{xStereo, yStereo};
 
     }
 
