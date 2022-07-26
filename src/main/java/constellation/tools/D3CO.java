@@ -192,30 +192,20 @@ public class D3CO {
 
             if (DEBUG_MODE) Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
 
-            // Group regions by number of satellites on sight, for this particular timestep
-            Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
-            AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
-                int nAssets = AAP.getnOfGwsInSight();
-                // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
-                if (byAssetsInSight.containsKey(nAssets)) {
-                    byAssetsInSight.get(nAssets).add(AAP);
-                } else {
-                    List<AAP> aapList = new ArrayList<>();
-                    aapList.add(AAP);
-                    byAssetsInSight.put(nAssets, aapList);
-                }
-            });
+            // Group regions by number of satellites on sight, for this particular time step
+            Map<Integer, List<AAP>> byAssetsInSight = mapByNOfAssets(AAPs, timeElapsed);
 
             double[] surfaceValues = new double[satelliteList.size()];
 
             // Perform intersection of AAPs with the ROI and surface area values calculation
             // For each number of assets
-            byAssetsInSight.forEach((key, value) -> {
+            byAssetsInSight.forEach((k, aaps) -> {
 
-                List<List<double[]>> toBeOr = new ArrayList<>();
+                List<List<double[]>> unionQueue = new ArrayList<>();
 
                 // For each AAP with this number of assets in sight
-                value.forEach(aap -> {
+                aaps.forEach(aap -> {
+
                     // Intersections with ROI
                     List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI,
                             Transformations.toEuclideanPlane(aap.getNonEuclideanCoordinates(),
@@ -223,53 +213,29 @@ public class D3CO {
 
                     if (eIntersection.size() >= 3) {
                         // Collections.reverse(eIntersection);
-                        toBeOr.add(eIntersection);
+                        unionQueue.add(eIntersection);
                     }
                     List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
 
-                    AAP intersectionAAP = new AAP(timeElapsed, key, aap.getGwsInSight(), neIntersection,
+                    AAP intersectionAAP = new AAP(timeElapsed, k, aap.getGwsInSight(), neIntersection,
                             neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                             neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
                     roiIntersections.add(intersectionAAP);
 
                 });
 
-                if (toBeOr.size() != 0) {
+                if (!unionQueue.isEmpty()) {
 
-                    // Union of all ROI intersections
-                    try {
-                        Epsilon eps = epsilon(0.0001);
-                        Polygon result = polygon(toBeOr.get(0));
-                        PolyBool.Segments segments = PolyBool.segments(eps, result);
-                        for (int i = 1; i < toBeOr.size(); i++) {
-                            PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(toBeOr.get(i)));
-                            PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
-                            segments = PolyBool.selectUnion(comb);
-                        }
+                    Polygon union = polyUnion(unionQueue);
 
-                        Polygon union = PolyBool.polygon(eps, segments);
-                        union.getRegions().forEach(region -> {
-                            List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                            surfaceValues[key - 1] = surfaceValues[key - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-                            AAP unionAAP = new AAP(timeElapsed, key, null, neIntersection,
-                                    neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                                    neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-                            roiUnions.add(unionAAP);
-                        });
-                    } catch (IndexOutOfBoundsException e1) {
-                        Log.error("IndexOutOfBoundsException " + e1.getMessage());
-                        Log.error("polygons to be or list size: " + toBeOr.size());
-                        toBeOr.forEach(region -> {
-                            Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
-                        });
-                    } catch (RuntimeException e2) {
-                        Log.error(e2.getMessage());
-                        Log.error("RuntimeException " + toBeOr.size());
-                        if (DEBUG_MODE) {
-                            toBeOr.forEach(region -> Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size()));
-                        }
-
-                    }
+                    union.getRegions().forEach(region -> {
+                        List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+                        surfaceValues[k - 1] = surfaceValues[k - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+                        AAP unionAAP = new AAP(timeElapsed, k, null, neIntersection,
+                                neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+                        roiUnions.add(unionAAP);
+                    });
                 }
 
             });
@@ -292,6 +258,63 @@ public class D3CO {
         saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
         saveAAPsAt(roiUnions, "snapshot_aaps_union", SNAPSHOT);
         reportGenerator.saveAsCSV(statistics, "coverage");
+
+    }
+
+    /**
+     * Performs the union of a list of polygons
+     * **/
+    private Polygon polyUnion(List<List<double[]>> unionQueue) {
+
+        Polygon union = new Polygon();
+
+        // Union of all ROI intersections
+        try {
+            Epsilon eps = epsilon(0.0001);
+            Polygon result = polygon(unionQueue.get(0));
+            PolyBool.Segments segments = PolyBool.segments(eps, result);
+            for (int i = 1; i < unionQueue.size(); i++) {
+                PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(unionQueue.get(i)));
+                PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                segments = PolyBool.selectUnion(comb);
+            }
+
+            union = PolyBool.polygon(eps, segments);
+
+        } catch (IndexOutOfBoundsException e1) {
+            Log.error("IndexOutOfBoundsException " + e1.getMessage());
+            Log.error("polygons to be or list size: " + unionQueue.size());
+            unionQueue.forEach(region -> {
+                Log.error("Region " + unionQueue.indexOf(region) + " size: " + unionQueue.size());
+            });
+        } catch (RuntimeException e2) {
+            Log.error(e2.getMessage());
+            Log.error("RuntimeException " + unionQueue.size());
+            if (DEBUG_MODE) {
+                unionQueue.forEach(region -> Log.error("Region " + unionQueue.indexOf(region) + " size: " + unionQueue.size()));
+            }
+        }
+
+        return union;
+
+    }
+
+    private Map<Integer, List<AAP>> mapByNOfAssets(List<AAP> AAPs, long timeElapsed) {
+
+        Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
+        AAPs.stream().filter(AAP -> AAP.getDate() == timeElapsed).forEach(AAP -> {
+            int nAssets = AAP.getnOfGwsInSight();
+            // accumulatedAreas.putIfAbsent(nAssets, surfaceInKm2);
+            if (byAssetsInSight.containsKey(nAssets)) {
+                byAssetsInSight.get(nAssets).add(AAP);
+            } else {
+                List<AAP> aapList = new ArrayList<>();
+                aapList.add(AAP);
+                byAssetsInSight.put(nAssets, aapList);
+            }
+        });
+
+        return byAssetsInSight;
 
     }
 
