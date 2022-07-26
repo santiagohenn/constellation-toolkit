@@ -40,7 +40,7 @@ public class D3CO {
     private final boolean DEBUG_MODE = Boolean.parseBoolean((String) prop.get("debug_mode"));
     private final boolean SAVE_EUCLIDEAN = Boolean.parseBoolean((String) prop.get("save_euclidean"));
     private final boolean SAVE_GEOGRAPHIC = Boolean.parseBoolean((String) prop.get("save_geographic"));
-    private final boolean SAVE_SNAPSHOT = ((String) prop.get("snapshot")).isBlank();
+    private final boolean SAVE_SNAPSHOT = !((String) prop.get("snapshot")).isBlank();
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
@@ -151,8 +151,8 @@ public class D3CO {
         if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
         if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
 
-        if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "ne_polygons_snapshot", SNAPSHOT);
-        if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "e_polygons_snapshot", SNAPSHOT);
+        if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
+        if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
 
 //        analyzeSurfaceCoverage(nonEuclideanAAPs);
         analyzeROICoverage(nonEuclideanAAPs);
