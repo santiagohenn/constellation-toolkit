@@ -36,8 +36,11 @@ public class D3CO {
     private final String OUTPUT_PATH = (String) prop.get("output_path");
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
     private final String ROI_PATH = (String) prop.get("roi_path");
-    private final boolean DEBUG = Boolean.parseBoolean((String) prop.get("debug_mode"));
     private final long SNAPSHOT = Long.parseLong((String) prop.get("snapshot"));
+    private final boolean DEBUG_MODE = Boolean.parseBoolean((String) prop.get("debug_mode"));
+    private final boolean SAVE_EUCLIDEAN = Boolean.parseBoolean((String) prop.get("save_euclidean"));
+    private final boolean SAVE_GEOGRAPHIC = Boolean.parseBoolean((String) prop.get("save_geographic"));
+    private final boolean SAVE_SNAPSHOT = ((String) prop.get("snapshot")).isBlank();
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
@@ -46,11 +49,6 @@ public class D3CO {
     private final List<String> statistics = new ArrayList<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
-
-    public static void main(String[] args) {
-        D3CO d3CO = new D3CO();
-        d3CO.run();
-    }
 
     /**
      * Default constructor
@@ -78,7 +76,7 @@ public class D3CO {
 
         double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
-        Log.debug("Computing AAPs");
+        if (DEBUG_MODE) Log.debug("Computing AAPs");
         while (pointerDate.compareTo(endDate) <= 0) {
 
             long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
@@ -137,9 +135,11 @@ public class D3CO {
                         nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                         nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
 
-                euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
-                        euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                        euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+                if (SAVE_EUCLIDEAN) {
+                    euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
+                            euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                            euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList())));
+                }
 
             }
 
@@ -148,20 +148,21 @@ public class D3CO {
 
         }
 
-        saveAAPs(nonEuclideanAAPs, "NEPolygons");
-        saveAAPs(euclideanAAPs, "EPolygons");
+        if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
+        if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
 
-        saveAAPsAt(nonEuclideanAAPs, "NEPolygons_debug", SNAPSHOT);
-        saveAAPsAt(euclideanAAPs, "EPolygons_debug", SNAPSHOT);
+        if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "ne_polygons_snapshot", SNAPSHOT);
+        if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "e_polygons_snapshot", SNAPSHOT);
 
 //        analyzeSurfaceCoverage(nonEuclideanAAPs);
-        Log.debug("Computing ROI coverage");
+
         analyzeROICoverage(nonEuclideanAAPs);
 
     }
 
     public void analyzeROICoverage(List<AAP> AAPs) {
 
+        if (DEBUG_MODE) Log.debug("Computing ROI coverage");
         statistics.clear();
 
         // Load ROI Data:
@@ -190,7 +191,7 @@ public class D3CO {
 
             long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
 
-//            Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
+            if (DEBUG_MODE) Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
 
             // Group regions by number of satellites on sight, for this particular timestep
             Map<Integer, List<AAP>> byAssetsInSight = new LinkedHashMap<>(MAX_SUBSET_SIZE);
@@ -268,9 +269,10 @@ public class D3CO {
                     } catch (RuntimeException e2) {
                         Log.error(e2.getMessage());
                         Log.error("RuntimeException " + toBeOr.size());
-                        toBeOr.forEach(region -> {
-                            Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size());
-                        });
+                        if (DEBUG_MODE) {
+                            toBeOr.forEach(region -> Log.error("Region " + toBeOr.indexOf(region) + " size: " + toBeOr.size()));
+                        }
+
                     }
                 }
 
@@ -291,8 +293,8 @@ public class D3CO {
 
         }
 
-        saveAAPsAt(roiIntersections, "intersections_AAPs", SNAPSHOT);
-        saveAAPsAt(roiUnions, "union_AAPs", SNAPSHOT);
+        saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
+        saveAAPsAt(roiUnions, "snapshot_aaps_union", SNAPSHOT);
         reportGenerator.saveAsCSV(statistics, "coverage");
 
     }
