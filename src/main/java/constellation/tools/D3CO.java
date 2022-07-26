@@ -149,12 +149,16 @@ public class D3CO {
             }
         }
 
-
-        if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
-        if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
-
-        if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
-        if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
+        try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
+            if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
+            pb.stepTo(25);
+            if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
+            pb.stepTo(50);
+            if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
+            pb.stepTo(75);
+            if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
+            pb.stepTo(100);
+        }
 
 //        analyzeSurfaceCoverage(nonEuclideanAAPs);
         analyzeROICoverage(nonEuclideanAAPs);
@@ -384,7 +388,7 @@ public class D3CO {
                 .collect(Collectors.toList()), fileName);
     }
 
-    // FIXME REPLACE WITH POST-ANALYSIS
+    // TODO REPLACE WITH POST-ANALYSIS
     private String stringifyResults(AbsoluteDate pointerDate, Map<Integer, Double> accumulatedAreas) {
 
         StringBuilder sb = new StringBuilder();
@@ -485,7 +489,6 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
     /**
      * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
@@ -511,111 +514,6 @@ public class D3CO {
 
         if (intersection.getRegions().size() > 0) {
             return intersection.getRegions().get(0);
-        } else {
-            return new ArrayList<>();
-        }
-
-    }
-
-    // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
-    /**
-     * This method takes two polygons, and returns their union using the Martinez-Rueda Algorithm.
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private List<double[]> uniteAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
-
-        List<List<double[]>> regions1 = new ArrayList<>();
-        regions1.add(polygonA);
-
-        List<List<double[]>> regions2 = new ArrayList<>();
-        regions2.add(polygonB);
-
-        Polygon polyA = new Polygon(regions1);
-        Polygon polyB = new Polygon(regions2);
-        Polygon union = new Polygon();
-
-        if (polyA.getRegions().get(0).size() >= 3 && polyB.getRegions().get(0).size() >= 3) {
-            Epsilon eps = epsilon();
-            union = PolyBool.union(eps, polyA, polyB);
-        }
-
-        if (union.getRegions().size() > 0) {
-            return union.getRegions().get(0);
-        } else {
-            return new ArrayList<>();
-        }
-
-    }
-
-    /**
-     * This method takes a polygon (A) and a polygon list and returns the unions between A and each polygon in the list.
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private List<List<double[]>> polyUnion(List<double[]> polygonA, List<List<double[]>> polygonList) {
-
-        List<List<double[]>> unionsList = new ArrayList<>();
-
-        // ROI
-        List<List<double[]>> roi = new ArrayList<>();
-        List<List<double[]>> aap = new ArrayList<>();
-        roi.add(polygonA);
-        Polygon polyA = new Polygon(roi);
-
-        Epsilon eps = epsilon();
-        Polygon union;
-
-        for (List<double[]> polygon : polygonList) {
-
-            aap.clear();
-            aap.add(polygon);
-            Polygon polyB = new Polygon(aap);
-
-            try {
-                union = PolyBool.union(eps, polyA, polyB);
-
-                if (union.getRegions().size() > 0) {
-                    unionsList.add(union.getRegions().get(0));
-                }
-
-            } catch (RuntimeException e) {
-                Log.error(e.getMessage());
-                polygonList.forEach(poly -> {
-                    Log.error("POLYGON SIZE: " + poly.size());
-                });
-            }
-
-        }
-
-
-        return unionsList;
-
-    }
-
-    /**
-     * This method takes a polygon A and a list of polygons L, and returns a list of intersections between A and every
-     * member of L, using the Martinez-Rueda Algorithm.
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private List<List<double[]>> intersectWithRegions(List<double[]> polygonA, List<List<double[]>> polygonList) {
-
-        List<List<double[]>> regions1 = new ArrayList<>();
-        regions1.add(polygonA);
-
-        Polygon polyA = new Polygon(regions1);
-        Polygon polyB = new Polygon(polygonList);
-        Polygon intersection = new Polygon();
-
-        if (polyA.getRegions().get(0).size() >= 3 && polygonList.size() > 0) {
-            Epsilon eps = epsilon();
-            intersection = PolyBool.intersect(eps, polyA, polyB);
-            return intersection.getRegions();
         } else {
             return new ArrayList<>();
         }
