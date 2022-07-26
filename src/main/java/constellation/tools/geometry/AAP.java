@@ -6,6 +6,7 @@ public class AAP {
 
     private long date;
     private int nOfGwsInSight;
+    private List<double[]> geoCoordinates;
     private List<Double> lats;
     private List<Double> longs;
     List<Integer> gwsInSight;
@@ -15,10 +16,17 @@ public class AAP {
 
     }
 
-    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<Double> lats, List<Double> longs, double surfaceInKm2) {
+    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+            , List<Double> lats, List<Double> longs) {
+        this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0);
+    }
+
+    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+            , List<Double> lats, List<Double> longs, double surfaceInKm2) {
         this.date = date;
         this.nOfGwsInSight = nOfGwsInSight;
         this.gwsInSight = gwsInSight;
+        this.geoCoordinates = nonEuclideanCoordinates;
         this.lats = lats;
         this.longs = longs;
         this.surfaceInKm2 = surfaceInKm2;
@@ -46,6 +54,10 @@ public class AAP {
 
     public void setGwsInSight(List<Integer> gwsInSight) {
         this.gwsInSight = gwsInSight;
+    }
+
+    public List<double[]> getGeoCoordinates() {
+        return geoCoordinates;
     }
 
     public List<Double> getLats() {

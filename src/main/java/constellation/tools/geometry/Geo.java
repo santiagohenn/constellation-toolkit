@@ -5,6 +5,9 @@ import net.sf.geographiclib.*;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
+import java.awt.geom.Path2D;
+import java.awt.geom.PathIterator;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,13 +26,34 @@ public class Geo {
      **/
     public static int checkPoleInclusion(FOV FOV, double lambdaMax) {
 
-        if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), 90, 0) <= lambdaMax) {
+        if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), 90, 0) <= lambdaMax) {
             return 1;
-        } else if (computeGeodesic(FOV.getReferenceLat(), FOV.getReferenceLon(), -90, 0) <= lambdaMax) {
+        } else if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), -90, 0) <= lambdaMax) {
             return -1;
         }
         return 0;
     }
+
+    /**
+     * Checks whether the provided refLat and refLon could contain any of Earth's poles
+     *
+     * @param refLat       The reference
+     * @param refLon       A List of Regions to check
+     * @param lambdaMax The Maximum Earth Central Angle of the regions to check
+     * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
+     * -1 if it contains the South Pole
+     **/
+    public static int checkPoleInclusion(double refLat, double refLon, double lambdaMax) {
+
+        if (computeGeodesic(refLat, refLon, 90, 0) <= lambdaMax) {
+            return 1;
+        } else if (computeGeodesic(refLat, refLon, -90, 0) <= lambdaMax) {
+            return -1;
+        }
+        return 0;
+    }
+
+
 
     /**
      * Computes the angular distance over the euclidean plane given two pair of Region objects. Said objects
@@ -40,7 +64,7 @@ public class Geo {
      * @return Double the computed angular distance in degrees
      **/
     public static double computeGeodesic(FOV r1, FOV r2) {
-        return computeGeodesic(r1.getReferenceLat(), r1.getReferenceLon(), r2.getReferenceLat(), r2.getReferenceLon());
+        return computeGeodesic(r1.getSspLat(), r1.getSspLon(), r2.getSspLat(), r2.getSspLon());
     }
 
     /**
@@ -65,7 +89,7 @@ public class Geo {
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
      **/
-    public static double computeNonEuclideanSurface(List<Pair> pairList) {
+    public static double computeNonEuclideanSurface(List<Pair> pairList) { // TODO: REMOVE IF 2 WORKS
 
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
@@ -80,7 +104,8 @@ public class Geo {
 
     /**
      * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
-     * vertices. This method uses the net.sf.geographiclib library.
+     * vertices. This method uses the net.sf.geographiclib library. Paper: https://doi.org/10.1007/s00190-012-0578-z
+     * Section 6 , C. F. F. Karney, Algorithms for geodesics, J. Geodesy 87, 43–55 (2013).
      *
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
@@ -230,6 +255,64 @@ public class Geo {
         return coordinates;
 
     }
+
+    /**
+     * Reads a file containing asset(s) parameter(s) and returns a list of objects accordingly
+     *
+     * @return List<Pair>
+     */
+    public static List<double[]> file2DoubleList(String fileName) {
+
+        List<double[]> pairList = new ArrayList<>();
+        var file = new File(fileName);
+        try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.startsWith("//") && line.length() > 0) {
+                    var data = line.split(",");
+                    pairList.add(new double[]{Double.parseDouble(data[0]), Double.parseDouble(data[1])});
+                }
+            }
+        } catch (FileNotFoundException e) {
+            Log.error("Unable to find file: " + fileName);
+            e.printStackTrace();
+        } catch (IOException e) {
+            Log.error("IOException: " + fileName);
+            e.printStackTrace();
+        }
+
+        return pairList;
+    }
+
+    public static int checkPoleInclusion(double[] coordinate, List<double[]> polygon) {
+
+        // First transform the polygon into a Path2D
+        Path2D.Double path2D = new Path2D.Double();
+        PathIterator iterator = path2D.getPathIterator(null);
+
+        int segment = 0;
+
+        for (double[] pair : polygon) {
+
+            if (segment == 0) {
+                path2D.moveTo(pair[0], pair[1]);
+            } else {
+                path2D.lineTo(pair[0], pair[1]);
+            }
+
+            segment++;
+
+        }
+
+        // TODO FINISH THIS METHOD
+
+        return 0;
+
+    }
+
+
+
+
 
 
 }
