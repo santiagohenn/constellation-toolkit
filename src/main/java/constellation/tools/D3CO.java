@@ -67,7 +67,6 @@ public class D3CO {
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
-//        AbsoluteDate pointerDate = startDate;
         double scenarioDuration = endDate.durationFrom(startDate);
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.

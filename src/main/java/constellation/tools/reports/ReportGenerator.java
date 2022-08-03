@@ -63,7 +63,22 @@ public class ReportGenerator {
         return true;
     }
 
-
+    /**
+     * Saves a String List to a file depicted in path
+     * @param entries the String to be stored
+     * @param name the path to the file
+     */
+    public boolean saveAs(List<String> entries, String name) {
+        try (FileWriter writer = new FileWriter(outputPath + name)) {
+            for (String entry : entries) {
+                writer.write(entry + '\n');
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
 
 
 }
