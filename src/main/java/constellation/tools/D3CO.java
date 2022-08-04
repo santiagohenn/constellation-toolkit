@@ -38,11 +38,11 @@ public class D3CO {
     private final String OUTPUT_PATH = (String) prop.get("output_path");
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
     private final String ROI_PATH = (String) prop.get("roi_path");
-    private final long SNAPSHOT = Long.parseLong((String) prop.get("snapshot"));
+    private final boolean SAVE_SNAPSHOT = !((String) prop.get("snapshot")).isBlank();
+    private final long SNAPSHOT = SAVE_SNAPSHOT ? Long.parseLong((String) prop.get("snapshot")) : 0L;
     private final boolean DEBUG_MODE = Boolean.parseBoolean((String) prop.get("debug_mode"));
     private final boolean SAVE_EUCLIDEAN = Boolean.parseBoolean((String) prop.get("save_euclidean"));
     private final boolean SAVE_GEOGRAPHIC = Boolean.parseBoolean((String) prop.get("save_geographic"));
-    private final boolean SAVE_SNAPSHOT = !((String) prop.get("snapshot")).isBlank();
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
     private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
@@ -79,6 +79,9 @@ public class D3CO {
         double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
 
         if (DEBUG_MODE) Log.debug("Computing AAPs");
+
+        long t0 = System.currentTimeMillis();
+
         try (ProgressBar pb = new ProgressBar("Obtaining AAPs", 100)) {
 
             pb.maxHint((long) scenarioDuration);
@@ -99,10 +102,16 @@ public class D3CO {
                     List<FOV> FOVsToIntersect = new ArrayList<>();
                     combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
 
-                    // Get reference point for the projection
+                    // Get reference point for the projection //FIXME use satellite lambda
                     int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
                     double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                     double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
+
+                    // DEBUG
+                    if (timeSinceStart == SNAPSHOT) {
+                        Log.debug(referenceLat + "," + referenceLon);
+                        Log.debug("L: "+Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD));
+                    }
 
                     // If this is the immediate FOV for a single satellite
                     if (combination.size() <= 1) {
@@ -161,6 +170,8 @@ public class D3CO {
 
 //        analyzeSurfaceCoverage(nonEuclideanAAPs);
         analyzeROICoverage(nonEuclideanAAPs);
+
+        Log.info("Time to compute: " + (System.currentTimeMillis() - t0));
 
     }
 
@@ -265,8 +276,11 @@ public class D3CO {
             }
         }
 
-        saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
-        saveAAPsAt(roiUnions, "snapshot_aaps_union", SNAPSHOT);
+        if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) {
+            saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
+            saveAAPsAt(roiUnions, "snapshot_aaps_union", SNAPSHOT);
+        }
+
         reportGenerator.saveAsCSV(statistics, "coverage");
 
     }
@@ -418,6 +432,7 @@ public class D3CO {
             simulation.setSatellite(satellite);
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
+
             double lambdaMax = Geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
             List<double[]> poly = Geo.drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
 
@@ -450,13 +465,25 @@ public class D3CO {
 
         List<List<Integer>> pairsToCheck = combination.computeCombinations(assetsToCheck, 2);
 
-        for (List<Integer> pairToCheck : pairsToCheck) {
+        for (List<Integer> pairToCheck : pairsToCheck) { // FIXME Use the biggest lambda
 
             int r1Idx = pairToCheck.get(0);
             int r2Idx = pairToCheck.get(1);
+
+            // FIX? // TODO CHECK THIS
+            double lambda1 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r1Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
+            double lambda2 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
-            if (distance >= 2 * lambdaMax) {
+//            if (distance >= (lambda1 + lambda2)) {
+//                return false;
+//            }
+
+//            if (distance >= (2 * lambdaMax)) {
+//                return false;
+//            }
+
+            if (distance >= (2 * lambdaMax)) {
                 return false;
             }
 
@@ -477,13 +504,16 @@ public class D3CO {
 
         // check proximity poles
         for (FOV FOV : regionsToIntersect) {
-            int proximity = Geo.checkPoleInclusion(FOV, lambdaMax);
+
+            // FIX // TODO REVISIT THIS
+            double lambda = Geo.getLambdaMax(satelliteList.get(FOV.getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
+
+            int proximity = Geo.checkPoleInclusion(FOV, lambda);
             if (proximity != 0) {
                 return proximity;
             }
         }
-        return 1;
-
+        return -1;
 
     }
 

@@ -27,9 +27,9 @@ public class Geo {
     public static int checkPoleInclusion(FOV FOV, double lambdaMax) {
 
         if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), 90, 0) <= lambdaMax) {
-            return 1;
-        } else if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), -90, 0) <= lambdaMax) {
             return -1;
+        } else if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), -90, 0) <= lambdaMax) {
+            return 1;
         }
         return 0;
     }
@@ -122,7 +122,7 @@ public class Geo {
         return Math.abs(result.area);
 
     }
-
+    // TODO change getLambda name and add a method without the threshold
     /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
      * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
