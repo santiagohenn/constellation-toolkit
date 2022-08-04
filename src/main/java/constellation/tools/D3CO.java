@@ -475,17 +475,17 @@ public class D3CO {
             double lambda2 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
-//            if (distance >= (lambda1 + lambda2)) {
+            if (distance >= (lambda1 + lambda2)) {
+                return false;
+            }
+
+//            if (distance >= (2 * lambdaMax)) {
 //                return false;
 //            }
 
 //            if (distance >= (2 * lambdaMax)) {
 //                return false;
 //            }
-
-            if (distance >= (2 * lambdaMax)) {
-                return false;
-            }
 
         }
 
