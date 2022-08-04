@@ -11,6 +11,7 @@ import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarStyle;
+import org.orekit.data.DataContext;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
@@ -18,6 +19,8 @@ import satellite.tools.structures.Ephemeris;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,7 +35,7 @@ public class D3CO {
     private static final Properties prop = Utils.loadProperties("config.properties");
     private static final String orekitPath = (String) prop.get("orekit_data_path");
     private final String START_DATE = (String) prop.get("start_date");
-    private final long UNIX_START_DATE = Utils.stamp2unix(START_DATE);
+    private final long UNIX_START_DATE = stamp2unix(START_DATE);
     private final String END_DATE = (String) prop.get("end_date");
     private final double TIME_STEP = Double.parseDouble((String) prop.get("time_step"));
     private final String OUTPUT_PATH = (String) prop.get("output_path");
@@ -61,11 +64,12 @@ public class D3CO {
 
     }
 
+    // FIXME URGENT: AM/PM!!!!!!!!!!!!
     public void run() {
 
         Simulation simulation = new Simulation(orekitPath);
 
-        AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
+        AbsoluteDate endDate = Utils.stamp2AD(END_DATE, DataContext.getDefault().getTimeScales().getUTC());
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
 
@@ -87,7 +91,7 @@ public class D3CO {
             pb.maxHint((long) scenarioDuration);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-                long timeSinceStart = Utils.stamp2unix(t.toString()) - Utils.stamp2unix(START_DATE);
+                long timeSinceStart = stamp2unix(t.toString()) - stamp2unix(START_DATE);
                 pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
 
                 // Obtain the starting non-euclidean FOVs and their surface value
@@ -108,10 +112,10 @@ public class D3CO {
                     double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
                     // DEBUG
-                    if (timeSinceStart == SNAPSHOT) {
-                        Log.debug(referenceLat + "," + referenceLon);
-                        Log.debug("L: "+Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD));
-                    }
+//                    if (timeSinceStart == SNAPSHOT) {
+//                        Log.debug(referenceLat + "," + referenceLon);
+//                        Log.debug("L: "+Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD));
+//                    }
 
                     // If this is the immediate FOV for a single satellite
                     if (combination.size() <= 1) {
@@ -205,10 +209,10 @@ public class D3CO {
             pb.maxHint((long) scenarioDuration);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-                long timeSinceStart = Utils.stamp2unix(t.toString()) - Utils.stamp2unix(START_DATE);
+                long timeSinceStart = stamp2unix(t.toString()) - stamp2unix(START_DATE);
                 pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
 
-                long timeElapsed = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+                long timeElapsed = stamp2unix(pointerDate.toString()) - stamp2unix(START_DATE);
 
                 if (DEBUG_MODE) Log.debug(" t = " + pointerDate + " - unix = " + timeElapsed);
 
@@ -356,7 +360,7 @@ public class D3CO {
 
             accumulatedAreas.clear();
 
-            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+            long timeSinceStart = stamp2unix(pointerDate.toString()) - stamp2unix(START_DATE);
             AAPs.stream().filter(AAP -> AAP.getDate() == timeSinceStart).forEach(AAP -> {
 
                 double surfaceInKm2 = Geo.computeNonEuclideanSurface2(AAP.getGeoCoordinates()) * 1E-6; // AAP.getSurfaceInKm2(); //
@@ -405,7 +409,7 @@ public class D3CO {
     private String stringifyResults(AbsoluteDate pointerDate, Map<Integer, Double> accumulatedAreas) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append(Utils.stamp2unix(pointerDate.toString()) - UNIX_START_DATE);
+        sb.append(stamp2unix(pointerDate.toString()) - UNIX_START_DATE);
 
         for (Integer key : accumulatedAreas.keySet()) {
             sb.append(",");
@@ -518,6 +522,7 @@ public class D3CO {
     }
 
     // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
+
     /**
      * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
      *
@@ -547,6 +552,21 @@ public class D3CO {
             return new ArrayList<>();
         }
 
+    }
+
+    // TODO: FIX URGENT IN SATELLITE TOOLS
+    public static long stamp2unix(String timestamp) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("UTCG"));
+        Date parsedDate = new Date();
+
+        try {
+            parsedDate = dateFormat.parse(timestamp);
+            return parsedDate.getTime();
+        } catch (ParseException var4) {
+            var4.printStackTrace();
+            return parsedDate.getTime();
+        }
     }
 
 
