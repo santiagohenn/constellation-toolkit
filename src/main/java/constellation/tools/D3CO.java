@@ -146,17 +146,18 @@ public class D3CO implements Runnable {
                         List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                         FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-                        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
+//                        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
+                        euclideanCoordinates = new ArrayList<>(polygonsToIntersect.get(0));
 
                         // Obtain access polygon
                         for (List<double[]> polygon : polygonsToIntersect) {
                             if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-                            intersectedPolygon = intersectAndGetPolygon(intersectedPolygon, polygon);
+                            euclideanCoordinates = intersectAndGetPolygon(euclideanCoordinates, polygon);
                         }
                         // Intersected polygon euclidean coordinates
-                        euclideanCoordinates = intersectedPolygon;
+//                        euclideanCoordinates = intersectedPolygon;
 
-                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersectedPolygon,
+                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(euclideanCoordinates,
                                 referenceLat, referenceLon);
 
                     } else {
@@ -179,6 +180,8 @@ public class D3CO implements Runnable {
                 }
             }
         }
+
+        Log.info("Performed: " + performed + " - Avoided: " + avoided);
 
         //        analyzeSurfaceCoverage(nonEuclideanAAPs);
         Log.info("Time to compute AAPs: " + (System.currentTimeMillis() - t0));
