@@ -10,7 +10,6 @@ import constellation.tools.math.Combination;
 import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
-import me.tongfei.progressbar.ProgressBarStyle;
 import org.orekit.data.DataContext;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
@@ -22,6 +21,7 @@ import satellite.tools.utils.Utils;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
@@ -30,7 +30,7 @@ import static com.menecats.polybool.helpers.PolyBoolHelper.polygon;
 /**
  * Dynamic Constellation Coverage Computer (D3CO)
  **/
-public class D3CO {
+public class D3CO implements Runnable {
 
     private static final Properties prop = Utils.loadProperties("config.properties");
     private static final String orekitPath = (String) prop.get("orekit_data_path");
@@ -56,6 +56,9 @@ public class D3CO {
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
 //    ProgressBar pb = new ProgressBar("Running", 100, ProgressBarStyle.ASCII);
 
+    Thread d3cothread;
+    String threadName;
+
     /**
      * Default constructor
      **/
@@ -64,7 +67,20 @@ public class D3CO {
 
     }
 
-    // FIXME URGENT: AM/PM!!!!!!!!!!!!
+    public D3CO(String threadName) {
+        this.threadName = threadName;
+    }
+
+    public void start() {
+        System.out.println("Thread started");
+        if (d3cothread == null) {
+            d3cothread = new Thread(this, threadName);
+            d3cothread.start();
+        }
+        this.run();
+    }
+
+    @Override
     public void run() {
 
         Simulation simulation = new Simulation(orekitPath);
@@ -85,6 +101,9 @@ public class D3CO {
         if (DEBUG_MODE) Log.debug("Computing AAPs");
 
         long t0 = System.currentTimeMillis();
+
+        int avoided = 0;
+        int performed = 0;
 
         try (ProgressBar pb = new ProgressBar("Obtaining AAPs", 100)) {
 
@@ -107,8 +126,7 @@ public class D3CO {
                     combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
 
                     // Get reference point for the projection //FIXME use satellite lambda
-                    int poleProximity = checkPoleInclusion(FOVsToIntersect, lambdaMax);
-//                    double[] antipode = Geo.computeAntipode();
+                    int poleProximity = checkPoleInclusion(FOVsToIntersect);
                     double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                     double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
@@ -121,7 +139,9 @@ public class D3CO {
                         euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
                                 referenceLat, referenceLon);
 
-                    } else if (checkDistances(combination, nonEuclideanFOVs, lambdaMax)) {
+                    } else if (checkDistances(combination, nonEuclideanFOVs)) {
+
+                        performed++;
 
                         List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                         FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
@@ -139,6 +159,8 @@ public class D3CO {
                         nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersectedPolygon,
                                 referenceLat, referenceLon);
 
+                    } else {
+                        avoided++;
                     }
 
                     // Save AAPs
@@ -158,6 +180,10 @@ public class D3CO {
             }
         }
 
+        //        analyzeSurfaceCoverage(nonEuclideanAAPs);
+        Log.info("Time to compute AAPs: " + (System.currentTimeMillis() - t0));
+        t0 = System.currentTimeMillis();
+
         try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
             if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
             pb.stepTo(25);
@@ -168,11 +194,12 @@ public class D3CO {
             if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
             pb.stepTo(100);
         }
+        Log.info("Time to Save files: " + (System.currentTimeMillis() - t0));
 
-//        analyzeSurfaceCoverage(nonEuclideanAAPs);
+        t0 = System.currentTimeMillis();
         analyzeROICoverage(nonEuclideanAAPs);
+        Log.info("Time to Analyze coverage: " + (System.currentTimeMillis() - t0));
 
-        Log.info("Time to compute: " + (System.currentTimeMillis() - t0));
 
     }
 
@@ -209,16 +236,25 @@ public class D3CO {
 
                 double[] surfaceValues = new double[satelliteList.size()];
 
+                // Starting euclidean ROI
+                AtomicReference<Double> roiReferenceLat = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLat());
+                AtomicReference<Double> roiReferenceLon = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLon());
+                AtomicReference<List<double[]>> euclideanROI = new AtomicReference<>(Transformations.toEuclideanPlane(nonEuclideanROI, roiReferenceLat.get(), roiReferenceLon.get()));
+
                 // Perform intersection of AAPs with the ROI and surface area values calculation
                 // For each number of assets
                 byAssetsInSight.forEach((k, aaps) -> {
 
                     // TODO: Generalize for any ROI
-//                    double referenceLat = -90;
                     double referenceLat = aaps.get(0).getReferenceLat();
-                    double referenceLon = 0;
+                    double referenceLon = aaps.get(0).getReferenceLon();
 
-                    List<double[]> euclideanROI = Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon);
+                    // Only if the reference changes, re-project
+                    if (referenceLat != roiReferenceLat.get() || referenceLon != roiReferenceLon.get()) {
+                        roiReferenceLat.set(referenceLat);
+                        roiReferenceLon.set(referenceLon);
+                        euclideanROI.set(Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon));
+                    }
 
                     List<List<double[]>> unionQueue = new ArrayList<>();
 
@@ -228,7 +264,7 @@ public class D3CO {
                         List<double[]> eIntersection;
 
                         // Intersections with ROI
-                        eIntersection = intersectAndGetPolygon(euclideanROI,
+                        eIntersection = intersectAndGetPolygon(euclideanROI.get(),
                                 Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
                                         referenceLat, referenceLon));
 
@@ -453,10 +489,9 @@ public class D3CO {
      *
      * @param assetsToCheck A List of Integer depicting the indexes of the satellites that are being checked
      * @param FOVList       A List of Region objects that will provide the SSP coordinates for the assets being checked
-     * @param lambdaMax     The maximum Earth Central Angle
      * @return boolean whether the intersection is empty or not
      **/
-    private boolean checkDistances(List<Integer> assetsToCheck, List<FOV> FOVList, double lambdaMax) {
+    private boolean checkDistances(List<Integer> assetsToCheck, List<FOV> FOVList) {
 
         // First we need to generate the combination list for the pair of assets that need checking
         Combination combination = new Combination();
@@ -486,16 +521,14 @@ public class D3CO {
      * Checks whether some FOV in the provided List contains any of Earth's poles
      *
      * @param regionsToIntersect A List of Regions to check
-     * @param lambdaMax          The Maximum Earth Central Angle of the regions to check
      * @return 0 if no FOV contains either the north or South Pole, 1 if some FOV contains the North Pole,
      * -1 if some FOV contains the South Pole
      **/
-    private int checkPoleInclusion(List<FOV> regionsToIntersect, double lambdaMax) {
+    private int checkPoleInclusion(List<FOV> regionsToIntersect) {
 
         // check proximity poles
         for (FOV FOV : regionsToIntersect) {
 
-            // TODO REVISIT THIS
             double lambda = Geo.getLambdaMax(satelliteList.get(FOV.getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
 
             int proximity = Geo.checkPoleInclusion(FOV, lambda);
