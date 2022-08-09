@@ -11,6 +11,8 @@ public class AAP {
     private List<Double> longs;
     List<Integer> gwsInSight;
     private double surfaceInKm2;
+    private double referenceLat;
+    private double referenceLon;
 
     public AAP() {
 
@@ -18,11 +20,16 @@ public class AAP {
 
     public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
             , List<Double> lats, List<Double> longs) {
-        this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0);
+        this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0, 0, 0);
     }
 
     public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
-            , List<Double> lats, List<Double> longs, double surfaceInKm2) {
+            , List<Double> lats, List<Double> longs, double referenceLat, double referenceLon) {
+        this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0, referenceLat, referenceLon);
+    }
+
+    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+            , List<Double> lats, List<Double> longs, double surfaceInKm2, double referenceLat, double referenceLon) {
         this.date = date;
         this.nOfGwsInSight = nOfGwsInSight;
         this.gwsInSight = gwsInSight;
@@ -30,6 +37,8 @@ public class AAP {
         this.lats = lats;
         this.longs = longs;
         this.surfaceInKm2 = surfaceInKm2;
+        this.referenceLat = referenceLat;
+        this.referenceLon = referenceLon;
     }
 
     public long getDate() {
@@ -82,6 +91,19 @@ public class AAP {
 
     public void setSurfaceInKm2(double surfaceInKm2) {
         this.surfaceInKm2 = surfaceInKm2;
+    }
+
+    public void setReference(double referenceLat, double referenceLon) {
+        this.referenceLat = referenceLat;
+        this.referenceLon = referenceLon;
+    }
+
+    public double getReferenceLat() {
+        return referenceLat;
+    }
+
+    public double getReferenceLon() {
+        return referenceLon;
     }
 
 }
