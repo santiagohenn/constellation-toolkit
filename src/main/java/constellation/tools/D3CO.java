@@ -21,6 +21,7 @@ import satellite.tools.utils.Utils;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -54,9 +55,9 @@ public class D3CO implements Runnable {
     private final List<String> statistics = new ArrayList<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
-//    ProgressBar pb = new ProgressBar("Running", 100, ProgressBarStyle.ASCII);
+    private final long[] timer = new long[]{0,0,0,0,0};
 
-    Thread d3cothread;
+    Thread d3coThread;
     String threadName;
 
     /**
@@ -73,9 +74,9 @@ public class D3CO implements Runnable {
 
     public void start() {
         System.out.println("Thread started");
-        if (d3cothread == null) {
-            d3cothread = new Thread(this, threadName);
-            d3cothread.start();
+        if (d3coThread == null) {
+            d3coThread = new Thread(this, threadName);
+            d3coThread.start();
         }
         this.run();
     }
@@ -96,11 +97,10 @@ public class D3CO implements Runnable {
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
 
-        double lambdaMax = Geo.getLambdaMax(satelliteList.get(0).getElement("a"), VISIBILITY_THRESHOLD); // FIXME do I use this?
-
         if (DEBUG_MODE) Log.debug("Computing AAPs");
 
         long t0 = System.currentTimeMillis();
+        long propTime = 0;
 
         int avoided = 0;
         int performed = 0;
@@ -114,7 +114,9 @@ public class D3CO implements Runnable {
                 pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
 
                 // Obtain the starting non-euclidean FOVs and their surface value
+                long t1 = System.currentTimeMillis();
                 List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, t);
+                propTime += (System.currentTimeMillis() - t1);
 
                 for (List<Integer> combination : combinationsList) {
 
@@ -134,7 +136,6 @@ public class D3CO implements Runnable {
                     if (combination.size() <= 1) {
                         int fovIdx = combination.get(0);
                         FOV neFov = nonEuclideanFOVs.get(fovIdx);
-                        // nonEuclideanCoordinates = Transformations.doubleList2pairList(nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates());
                         nonEuclideanCoordinates = nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates();
                         euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
                                 referenceLat, referenceLon);
@@ -146,7 +147,6 @@ public class D3CO implements Runnable {
                         List<List<double[]>> polygonsToIntersect = new ArrayList<>();
                         FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-//                        List<double[]> intersectedPolygon = new ArrayList<>(polygonsToIntersect.get(0));
                         euclideanCoordinates = new ArrayList<>(polygonsToIntersect.get(0));
 
                         // Obtain access polygon
@@ -154,8 +154,6 @@ public class D3CO implements Runnable {
                             if (polygonsToIntersect.indexOf(polygon) == 0) continue;
                             euclideanCoordinates = intersectAndGetPolygon(euclideanCoordinates, polygon);
                         }
-                        // Intersected polygon euclidean coordinates
-//                        euclideanCoordinates = intersectedPolygon;
 
                         nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(euclideanCoordinates,
                                 referenceLat, referenceLon);
@@ -181,6 +179,7 @@ public class D3CO implements Runnable {
             }
         }
 
+        Log.info("Prop Time: " + propTime);
         Log.info("Performed: " + performed + " - Avoided: " + avoided);
 
         //        analyzeSurfaceCoverage(nonEuclideanAAPs);
@@ -217,22 +216,20 @@ public class D3CO implements Runnable {
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
-        AbsoluteDate pointerDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
 
         List<AAP> roiIntersections = new ArrayList<>();
         List<AAP> roiUnions = new ArrayList<>();
+        AtomicInteger changes = new AtomicInteger();
 
         try (ProgressBar pb = new ProgressBar("ROI coverage", 100)) {
 
             pb.maxHint((long) scenarioDuration);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-                long timeSinceStart = stamp2unix(t.toString()) - stamp2unix(START_DATE);
-                pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
-
-                long timeElapsed = stamp2unix(pointerDate.toString()) - stamp2unix(START_DATE);
+                long timeElapsed = stamp2unix(t.toString()) - stamp2unix(START_DATE);
+                pb.stepTo((long) (Math.round(timeElapsed * 100 * 100.00 / scenarioDuration) / 100.00));
 
                 // Group regions by number of satellites on sight, for this particular time step
                 Map<Integer, List<AAP>> byAssetsInSight = mapByNOfAssets(AAPs, timeElapsed);
@@ -254,6 +251,7 @@ public class D3CO implements Runnable {
 
                     // Only if the reference changes, re-project
                     if (referenceLat != roiReferenceLat.get() || referenceLon != roiReferenceLon.get()) {
+                        changes.getAndIncrement();
                         roiReferenceLat.set(referenceLat);
                         roiReferenceLon.set(referenceLon);
                         euclideanROI.set(Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon));
@@ -308,11 +306,10 @@ public class D3CO implements Runnable {
 
                 statistics.add(sb.toString());
 
-                // Advance timestep
-                pointerDate = pointerDate.shiftedBy(TIME_STEP);
-
             }
         }
+
+        Log.info("Changes: " + changes);
 
         if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) {
             saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
@@ -589,6 +586,15 @@ public class D3CO implements Runnable {
             var4.printStackTrace();
             return parsedDate.getTime();
         }
+    }
+
+    private void tic(int clock) {
+        this.timer[clock] = System.currentTimeMillis();
+    }
+
+    private long toc(int clock) {
+        this.timer[clock] = System.currentTimeMillis() - timer[clock];
+        return timer[clock];
     }
 
 
