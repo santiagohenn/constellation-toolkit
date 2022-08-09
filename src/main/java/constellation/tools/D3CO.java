@@ -56,6 +56,7 @@ public class D3CO implements Runnable {
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
     private final long[] timer = new long[]{0,0,0,0,0};
+    private final double[] metrics = new double[]{0,0,0,0,0};
 
     Thread d3coThread;
     String threadName;
@@ -99,9 +100,8 @@ public class D3CO implements Runnable {
 
         if (DEBUG_MODE) Log.debug("Computing AAPs");
 
-        long t0 = System.currentTimeMillis();
+        tic(1);
         long propTime = 0;
-
         int avoided = 0;
         int performed = 0;
 
@@ -110,13 +110,13 @@ public class D3CO implements Runnable {
             pb.maxHint((long) scenarioDuration);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-                long timeSinceStart = stamp2unix(t.toString()) - stamp2unix(START_DATE);
-                pb.stepTo((long) (Math.round(timeSinceStart * 100 * 100.00 / scenarioDuration) / 100.00));
+                long timeElapsed = stamp2unix(t.toString()) - stamp2unix(START_DATE);
+                pb.stepTo((long) (Math.round(timeElapsed * 100 * 100.00 / scenarioDuration) / 100.00));
 
                 // Obtain the starting non-euclidean FOVs and their surface value
-                long t1 = System.currentTimeMillis();
+                tic(0);
                 List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, t);
-                propTime += (System.currentTimeMillis() - t1);
+                accMetric(0, toc(0));
 
                 for (List<Integer> combination : combinationsList) {
 
@@ -136,40 +136,57 @@ public class D3CO implements Runnable {
                     if (combination.size() <= 1) {
                         int fovIdx = combination.get(0);
                         FOV neFov = nonEuclideanFOVs.get(fovIdx);
+                        tic(0);
                         nonEuclideanCoordinates = nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates();
                         euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
                                 referenceLat, referenceLon);
+                        accMetric(1, toc(0));
 
                     } else if (checkDistances(combination, nonEuclideanFOVs)) {
 
                         performed++;
+                        List<List<double[]>> intersectionQueue = new ArrayList<>();
+                        FOVsToIntersect.forEach(FOV -> intersectionQueue.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-                        List<List<double[]>> polygonsToIntersect = new ArrayList<>();
-                        FOVsToIntersect.forEach(FOV -> polygonsToIntersect.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
+//                        euclideanCoordinates = new ArrayList<>(intersectionQueue.get(0));
 
-                        euclideanCoordinates = new ArrayList<>(polygonsToIntersect.get(0));
-
+                        tic(0);
                         // Obtain access polygon
-                        for (List<double[]> polygon : polygonsToIntersect) {
-                            if (polygonsToIntersect.indexOf(polygon) == 0) continue;
-                            euclideanCoordinates = intersectAndGetPolygon(euclideanCoordinates, polygon);
+                        if (!intersectionQueue.isEmpty()) {
+                            Polygon intersection = polyIntersect(intersectionQueue);
+                            nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersection.getRegions().get(0),
+                                    referenceLat, referenceLon);
+//                            intersection.getRegions().forEach(region -> {
+//                                List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+////                                surfaceValues[k - 1] = surfaceValues[k - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
+//                                AAP intersectionAAP = new AAP(timeElapsed, combination.size(), null, neIntersection,
+//                                        neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+//                                        neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
+////                                roiUnions.add(intersectionAAP);
+//                            });
                         }
 
-                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(euclideanCoordinates,
-                                referenceLat, referenceLon);
+//                        for (List<double[]> polygon : intersectionQueue) {
+//                            if (intersectionQueue.indexOf(polygon) == 0) continue;
+//                            euclideanCoordinates = intersectAndGetPolygon(euclideanCoordinates, polygon);
+//                        }
+//                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(euclideanCoordinates,
+//                                referenceLat, referenceLon);
+
+                        accMetric(2, toc(0));
 
                     } else {
                         avoided++;
                     }
 
                     // Save AAPs
-                    nonEuclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, nonEuclideanCoordinates,
+                    nonEuclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, nonEuclideanCoordinates,
                             nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                             nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
                             referenceLat, referenceLon));
 
                     if (SAVE_EUCLIDEAN) {
-                        euclideanAAPs.add(new AAP(timeSinceStart, combination.size(), combination, euclideanCoordinates,
+                        euclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, euclideanCoordinates,
                                 euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                                 euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
                                 referenceLat, referenceLon));
@@ -179,29 +196,32 @@ public class D3CO implements Runnable {
             }
         }
 
-        Log.info("Prop Time: " + propTime);
+        Log.info("Prop Time: " + metrics[0]);
+        Log.info("Initial K=1 AAPs: " + metrics[1]);
+        Log.info("Intersect: " + metrics[2]);
         Log.info("Performed: " + performed + " - Avoided: " + avoided);
 
         //        analyzeSurfaceCoverage(nonEuclideanAAPs);
-        Log.info("Time to compute AAPs: " + (System.currentTimeMillis() - t0));
-        t0 = System.currentTimeMillis();
+        Log.info("Time to compute AAPs: " + toc(1));
 
-        try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
-            if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
-            pb.stepTo(25);
-            if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
-            pb.stepTo(50);
-            if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
-            pb.stepTo(75);
-            if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
-            pb.stepTo(100);
+        tic(2);
+        if (SAVE_GEOGRAPHIC || SAVE_EUCLIDEAN || SAVE_SNAPSHOT) {
+            try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
+                if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
+                pb.stepTo(25);
+                if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
+                pb.stepTo(50);
+                if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
+                pb.stepTo(75);
+                if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
+                pb.stepTo(100);
+            }
         }
-        Log.info("Time to Save files: " + (System.currentTimeMillis() - t0));
+        Log.info("Time to Save files: " + toc(2));
 
-        t0 = System.currentTimeMillis();
+        tic(3);
         analyzeROICoverage(nonEuclideanAAPs);
-        Log.info("Time to Analyze coverage: " + (System.currentTimeMillis() - t0));
-
+        Log.info("Time to Analyze coverage: " + toc(3));
 
     }
 
@@ -355,6 +375,45 @@ public class D3CO implements Runnable {
         }
 
         return union;
+
+    }
+
+    /**
+     * Performs the Intersection of a list of polygons
+     **/
+    private Polygon polyIntersect(List<List<double[]>> intersectionQueue) {
+
+        Polygon intersection = new Polygon();
+
+        // Union of all ROI intersections
+        try {
+            Epsilon eps = epsilon(0.0001);
+            Polygon result = polygon(intersectionQueue.get(0));
+            PolyBool.Segments segments = PolyBool.segments(eps, result);
+            for (int i = 1; i < intersectionQueue.size(); i++) {
+                PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(intersectionQueue.get(i)));
+                PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+//                segments = PolyBool.selectUnion(comb);
+                segments = PolyBool.selectIntersect(comb);
+            }
+
+            intersection = PolyBool.polygon(eps, segments);
+
+        } catch (IndexOutOfBoundsException e1) {
+            Log.error("IndexOutOfBoundsException " + e1.getMessage());
+            Log.error("polygons to be or list size: " + intersectionQueue.size());
+            intersectionQueue.forEach(region -> {
+                Log.error("Region " + intersectionQueue.indexOf(region) + " size: " + intersectionQueue.size());
+            });
+        } catch (RuntimeException e2) {
+            Log.error(e2.getMessage());
+            Log.error("RuntimeException " + intersectionQueue.size());
+            if (DEBUG_MODE) {
+                intersectionQueue.forEach(region -> Log.error("Region " + intersectionQueue.indexOf(region) + " size: " + intersectionQueue.size()));
+            }
+        }
+
+        return intersection;
 
     }
 
@@ -597,5 +656,8 @@ public class D3CO implements Runnable {
         return timer[clock];
     }
 
+    private void accMetric(int slot, double metric) {
+        this.metrics[slot] += metric;
+    }
 
 }
