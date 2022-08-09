@@ -55,8 +55,8 @@ public class D3CO implements Runnable {
     private final List<String> statistics = new ArrayList<>();
 
     ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
-    private final long[] timer = new long[]{0,0,0,0,0};
-    private final double[] metrics = new double[]{0,0,0,0,0};
+    private final long[] timer = new long[]{0, 0, 0, 0, 0, 0};
+    private final double[] metrics = new double[]{0, 0, 0, 0, 0, 0};
 
     Thread d3coThread;
     String threadName;
@@ -101,7 +101,6 @@ public class D3CO implements Runnable {
         if (DEBUG_MODE) Log.debug("Computing AAPs");
 
         tic(1);
-        long propTime = 0;
         int avoided = 0;
         int performed = 0;
 
@@ -142,37 +141,21 @@ public class D3CO implements Runnable {
                                 referenceLat, referenceLon);
                         accMetric(1, toc(0));
 
-                    } else if (checkDistances(combination, nonEuclideanFOVs)) {
+                    } else if (checkDistances(combination, nonEuclideanFOVs) && !FOVsToIntersect.isEmpty()) {
 
                         performed++;
                         List<List<double[]>> intersectionQueue = new ArrayList<>();
                         FOVsToIntersect.forEach(FOV -> intersectionQueue.add(Transformations.toEuclideanPlane(FOV.getPolygonCoordinates(), referenceLat, referenceLon)));
 
-//                        euclideanCoordinates = new ArrayList<>(intersectionQueue.get(0));
-
-                        tic(0);
                         // Obtain access polygon
-                        if (!intersectionQueue.isEmpty()) {
-                            Polygon intersection = polyIntersect(intersectionQueue);
+                        tic(0);
+                        Polygon intersection = polyIntersect(intersectionQueue);
+                        if (intersection.getRegions().size() > 0 && intersection.getRegions().get(0).size() > 3) {
                             nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersection.getRegions().get(0),
                                     referenceLat, referenceLon);
-//                            intersection.getRegions().forEach(region -> {
-//                                List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-////                                surfaceValues[k - 1] = surfaceValues[k - 1] + Geo.computeNonEuclideanSurface2(neIntersection);
-//                                AAP intersectionAAP = new AAP(timeElapsed, combination.size(), null, neIntersection,
-//                                        neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-//                                        neIntersection.stream().map(pair -> pair[1]).collect(Collectors.toList()));
-////                                roiUnions.add(intersectionAAP);
-//                            });
+                        } else {
+                            Log.warn("Intersection warning");
                         }
-
-//                        for (List<double[]> polygon : intersectionQueue) {
-//                            if (intersectionQueue.indexOf(polygon) == 0) continue;
-//                            euclideanCoordinates = intersectAndGetPolygon(euclideanCoordinates, polygon);
-//                        }
-//                        nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(euclideanCoordinates,
-//                                referenceLat, referenceLon);
-
                         accMetric(2, toc(0));
 
                     } else {
@@ -180,10 +163,12 @@ public class D3CO implements Runnable {
                     }
 
                     // Save AAPs
-                    nonEuclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, nonEuclideanCoordinates,
-                            nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
-                            nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
-                            referenceLat, referenceLon));
+                    if (nonEuclideanCoordinates.size() > 2) {
+                        nonEuclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, nonEuclideanCoordinates,
+                                nonEuclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
+                                nonEuclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
+                                referenceLat, referenceLon));
+                    }
 
                     if (SAVE_EUCLIDEAN) {
                         euclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, euclideanCoordinates,
@@ -199,6 +184,7 @@ public class D3CO implements Runnable {
         Log.info("Prop Time: " + metrics[0]);
         Log.info("Initial K=1 AAPs: " + metrics[1]);
         Log.info("Intersect: " + metrics[2]);
+        Log.info("Intersect (bis): " + metrics[4]);
         Log.info("Performed: " + performed + " - Avoided: " + avoided);
 
         //        analyzeSurfaceCoverage(nonEuclideanAAPs);
@@ -219,9 +205,7 @@ public class D3CO implements Runnable {
         }
         Log.info("Time to Save files: " + toc(2));
 
-        tic(3);
         analyzeROICoverage(nonEuclideanAAPs);
-        Log.info("Time to Analyze coverage: " + toc(3));
 
     }
 
@@ -243,6 +227,7 @@ public class D3CO implements Runnable {
         List<AAP> roiUnions = new ArrayList<>();
         AtomicInteger changes = new AtomicInteger();
 
+        tic(3);
         try (ProgressBar pb = new ProgressBar("ROI coverage", 100)) {
 
             pb.maxHint((long) scenarioDuration);
@@ -282,12 +267,12 @@ public class D3CO implements Runnable {
                     // For each AAP with this number of assets in sight
                     aaps.forEach(aap -> {
 
-                        List<double[]> eIntersection;
-
                         // Intersections with ROI
-                        eIntersection = intersectAndGetPolygon(euclideanROI.get(),
+                        tic(5);
+                        List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI.get(),
                                 Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
                                         referenceLat, referenceLon));
+                        accMetric(5, toc(5));
 
                         if (eIntersection.size() >= 3) {
                             // Collections.reverse(eIntersection);
@@ -328,8 +313,9 @@ public class D3CO implements Runnable {
 
             }
         }
-
+        Log.info("Time to Analyze coverage: " + toc(3));
         Log.info("Changes: " + changes);
+        Log.info("Intersect (bis bis): " + metrics[5]);
 
         if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) {
             saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", SNAPSHOT);
@@ -392,8 +378,9 @@ public class D3CO implements Runnable {
             PolyBool.Segments segments = PolyBool.segments(eps, result);
             for (int i = 1; i < intersectionQueue.size(); i++) {
                 PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(intersectionQueue.get(i)));
+                tic(4);
                 PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
-//                segments = PolyBool.selectUnion(comb);
+                accMetric(4, toc(4));
                 segments = PolyBool.selectIntersect(comb);
             }
 
@@ -557,12 +544,12 @@ public class D3CO implements Runnable {
 
         List<List<Integer>> pairsToCheck = combination.computeCombinations(assetsToCheck, 2);
 
-        for (List<Integer> pairToCheck : pairsToCheck) { // FIXME Use the biggest lambda
+        for (List<Integer> pairToCheck : pairsToCheck) {
 
             int r1Idx = pairToCheck.get(0);
             int r2Idx = pairToCheck.get(1);
 
-            // FIX? // TODO CHECK THIS
+            // FIX
             double lambda1 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r1Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double lambda2 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
