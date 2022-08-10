@@ -103,10 +103,13 @@ public class D3CO implements Runnable {
         tic(1);
         int avoided = 0;
         int performed = 0;
+        int escaped = 0;
 
         try (ProgressBar pb = new ProgressBar("Obtaining AAPs", 100)) {
 
             pb.maxHint((long) scenarioDuration);
+
+            tic(2);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
                 long timeElapsed = stamp2unix(t.toString()) - stamp2unix(START_DATE);
@@ -128,6 +131,7 @@ public class D3CO implements Runnable {
 
                     // Get reference point for the projection //FIXME use satellite lambda
                     int poleProximity = checkPoleInclusion(FOVsToIntersect);
+                    poleProximity = 1;
                     double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                     double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
 
@@ -150,11 +154,11 @@ public class D3CO implements Runnable {
                         // Obtain access polygon
                         tic(0);
                         Polygon intersection = polyIntersect(intersectionQueue);
-                        if (intersection.getRegions().size() > 0 && intersection.getRegions().get(0).size() > 3) {
+                        if (intersection.getRegions().size() > 0 && intersection.getRegions().get(0).size() > 2) {
                             nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersection.getRegions().get(0),
                                     referenceLat, referenceLon);
                         } else {
-                            Log.warn("Intersection warning");
+                            escaped++;
                         }
                         accMetric(2, toc(0));
 
@@ -185,12 +189,9 @@ public class D3CO implements Runnable {
         Log.info("Initial K=1 AAPs: " + metrics[1]);
         Log.info("Intersect: " + metrics[2]);
         Log.info("Intersect (bis): " + metrics[4]);
-        Log.info("Performed: " + performed + " - Avoided: " + avoided);
-
-        //        analyzeSurfaceCoverage(nonEuclideanAAPs);
+        Log.info("Performed: " + performed + " - Avoided: " + avoided + " - Escaped: " + escaped);
         Log.info("Time to compute AAPs: " + toc(1));
 
-        tic(2);
         if (SAVE_GEOGRAPHIC || SAVE_EUCLIDEAN || SAVE_SNAPSHOT) {
             try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
                 if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
@@ -203,9 +204,10 @@ public class D3CO implements Runnable {
                 pb.stepTo(100);
             }
         }
-        Log.info("Time to Save files: " + toc(2));
 
+        //        analyzeSurfaceCoverage(nonEuclideanAAPs);
         analyzeROICoverage(nonEuclideanAAPs);
+        Log.info("Total: " + toc(2));
 
     }
 
@@ -268,11 +270,9 @@ public class D3CO implements Runnable {
                     aaps.forEach(aap -> {
 
                         // Intersections with ROI
-                        tic(5);
                         List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI.get(),
                                 Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
                                         referenceLat, referenceLon));
-                        accMetric(5, toc(5));
 
                         if (eIntersection.size() >= 3) {
                             // Collections.reverse(eIntersection);
