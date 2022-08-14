@@ -1,6 +1,7 @@
 package constellation.tools.geometry;
 
 import constellation.tools.math.Pair;
+import constellation.tools.math.Transformations;
 import net.sf.geographiclib.*;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
@@ -15,6 +16,12 @@ import java.util.List;
  * Contains Geographic operations
  */
 public class Geo {
+
+    public static final double EARTH_RADIUS_EQ_M = 6378135.0D;
+    public static final double WGS84_EQ_RADIUS_M = 6378137.0D;
+    public static final double WGS84_F = 1 / 298.257223563;
+    public static final double WGS84_E2 = 0.00669437999014;
+    public static final double WGS84_E = 0.081819190842613;
 
     /**
      * Checks whether the provided FOV contains any of Earth's poles
@@ -121,6 +128,7 @@ public class Geo {
         return Math.abs(result.area);
 
     }
+
     // TODO change getLambda name and add a method without the threshold
 
     /**
@@ -170,7 +178,7 @@ public class Geo {
         double theta;
 
         // Obtain center latitude' in radians
-        double centerLat_ = (Math.PI / 2.0) - (Math.toRadians(centerLat));
+        double centerLat_ = (Math.PI / 2.0) - (Math.toRadians(gdLat2gcLatD(centerLat)));
 
         for (int segment = 1; segment <= segments; segment++) {
 
@@ -224,6 +232,7 @@ public class Geo {
                 pointerLon = 0;
             }
 
+            // FIXME use the normalize angle of Geo netgeographiclib
             while (pointerLon < -180D) {
                 pointerLon = pointerLon + 360;
             }
@@ -248,7 +257,9 @@ public class Geo {
 
             }
 
-            coordinates.add(new double[]{pointerLat, pointerLon});
+//            double conformalLat = Transformations.lat2conformal(pointerLat);
+//            conformalLat = pointerLat;
+            coordinates.add(new double[]{gcLat2gdLatD(pointerLat), pointerLon});
 
         }
 
@@ -326,6 +337,64 @@ public class Geo {
 
         return antipode;
 
+    }
+
+    /**
+     * Computes the geodetic latitude given a spherical latitude in radians and a height h
+     *
+     * @param gcLat the geocentric latitude in radians
+     * @param h     the height in meters
+     * @return double the geodetic latitude
+     **/
+    public static double gcLat2gdLat(double gcLat, double h) {
+
+        double a = Math.pow(Math.sin(gcLat), 2);
+        double rn = EARTH_RADIUS_EQ_M / (Math.sqrt(1 - WGS84_E2 * a));
+        double b = 1 - WGS84_E2 * (rn / (rn + h));
+        return Math.atan(Math.tan(gcLat) / b);
+
+    }
+
+    /**
+     * Computes the geodetic latitude given a spherical latitude for a point in the surface of a sphere
+     *
+     * @param gcLat the geocentric latitude in radians
+     * @return double the geodetic latitude
+     **/
+    public static double gcLat2gdLat(double gcLat) {
+        return Math.atan2(Math.tan(gcLat), (1 - WGS84_E2));
+    }
+
+    /**
+     * Computes the geodetic latitude given a spherical latitude for a point in the surface of a sphere
+     *
+     * @param gcLat the geocentric latitude in degrees
+     * @return double the geodetic latitude
+     **/
+    public static double gcLat2gdLatD(double gcLat) { // TODO normalize either degrees or radians usage
+        double gcLatRad = Math.toRadians(gcLat);
+        return Math.toDegrees(gcLat2gdLat(gcLatRad));
+    }
+
+    /**
+     * Computes the geocentric latitude given a geodetic latitude for a point in the surface of an ellipsoid
+     *
+     * @param lat the geodetic latitude in radians
+     * @return double the geocentric latitude in radians
+     **/
+    public static double gdLat2gcLat(double lat) { // TODO normalize either degrees or radians usage
+        return Math.atan((1 - WGS84_E2) * Math.tan(lat));
+    }
+
+    /**
+     * Computes the geocentric latitude given a geodetic latitude for a point in the surface of an ellipsoid
+     *
+     * @param gdLat the geodetic latitude in degrees
+     * @return double the geocentric latitude
+     **/
+    public static double gdLat2gcLatD(double gdLat) { // TODO normalize either degrees or radians usage
+        double gdLatRad = Math.toRadians(gdLat);
+        return Math.toDegrees(gdLat2gcLat(gdLatRad));
     }
 
 

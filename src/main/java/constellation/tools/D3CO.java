@@ -130,7 +130,7 @@ public class D3CO implements Runnable {
                     combination.forEach(regionIndex -> FOVsToIntersect.add(nonEuclideanFOVs.get(regionIndex)));
 
                     // Get reference point for the projection //FIXME use satellite lambda
-                    int poleProximity = checkPoleInclusion(FOVsToIntersect);
+                    int poleProximity; // = checkPoleInclusion(FOVsToIntersect);
                     poleProximity = 1;
                     double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
                     double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
@@ -139,11 +139,9 @@ public class D3CO implements Runnable {
                     if (combination.size() <= 1) {
                         int fovIdx = combination.get(0);
                         FOV neFov = nonEuclideanFOVs.get(fovIdx);
-                        tic(0);
                         nonEuclideanCoordinates = nonEuclideanFOVs.get(fovIdx).getPolygonCoordinates();
                         euclideanCoordinates = Transformations.toEuclideanPlane(neFov.getPolygonCoordinates(),
                                 referenceLat, referenceLon);
-                        accMetric(1, toc(0));
 
                     } else if (checkDistances(combination, nonEuclideanFOVs) && !FOVsToIntersect.isEmpty()) {
 
@@ -554,12 +552,11 @@ public class D3CO implements Runnable {
             double lambda2 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
-            if (distance >= (lambda1 + lambda2)) {
+            // FIXME ADD MARGIN
+            if (distance >= (lambda1 + lambda2) * 1.02) {
                 return false;
             }
-
         }
-
         return true;
     }
 
