@@ -113,25 +113,6 @@ public class Transformations {
 
     }
 
-    public static double conformal2lat(double confLat) {
-
-        return confLat + (Math.pow(Math.E, 2) / 2 + 5 * Math.pow(Math.E, 4) / 24 + 1 * Math.pow(Math.E, 6) / 12 + 13 * Math.pow(Math.E, 8) / 360) * Math.sin(2 * confLat)
-                + (7 * Math.pow(Math.E, 4) / 48 + 29 * Math.pow(Math.E, 6) / 240 + 811 * Math.pow(Math.E, 8) / 11520) * Math.sin(4 * confLat)
-                + (7 * Math.pow(Math.E, 6) / 120 + 81 * Math.pow(Math.E, 8) / 1120) * Math.sin(6 * confLat)
-                + (4279 * Math.pow(Math.E, 8) / 161280) * Math.sin(8 * confLat);
-
-    }
-
-    public static double lat2conformal(double sphericalLat) {
-
-        return sphericalLat + (Math.pow(Math.E, 2) / 2 + 5 * Math.pow(Math.E, 4) / 24 + 3 * Math.pow(Math.E, 6) / 32 + 281 * Math.pow(Math.E, 8) / 5760) * Math.sin(2 * sphericalLat)
-                + (5 * Math.pow(Math.E, 4) / 48 + 7 * Math.pow(Math.E, 6) / 80 + 697 * Math.pow(Math.E, 8) / 11520) * Math.sin(4 * sphericalLat)
-                + (13 * Math.pow(Math.E, 6) / 480 + 461 * Math.pow(Math.E, 8) / 13440) * Math.sin(6 * sphericalLat)
-                + (1237 * Math.pow(Math.E, 8) / 161280) * Math.sin(8 * sphericalLat);
-
-    }
-
-
     public static synchronized List<Pair> doubleList2pairList(List<double[]> polygon) {
 
         List<Pair> pairList = new ArrayList<>();

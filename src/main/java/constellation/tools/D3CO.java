@@ -172,13 +172,12 @@ public class D3CO implements Runnable {
                                 referenceLat, referenceLon));
                     }
 
-                    if (SAVE_EUCLIDEAN) {
+                    if (SAVE_EUCLIDEAN && DEBUG_MODE) {
                         euclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, euclideanCoordinates,
                                 euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                                 euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
                                 referenceLat, referenceLon));
                     }
-
                 }
             }
         }
@@ -192,9 +191,9 @@ public class D3CO implements Runnable {
 
         if (SAVE_GEOGRAPHIC || SAVE_EUCLIDEAN || SAVE_SNAPSHOT) {
             try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
-                if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
+                if (SAVE_GEOGRAPHIC && !SAVE_SNAPSHOT) saveAAPs(nonEuclideanAAPs, "ne_polygons");
                 pb.stepTo(25);
-                if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
+                if (SAVE_EUCLIDEAN && !SAVE_SNAPSHOT) saveAAPs(euclideanAAPs, "e_polygons");
                 pb.stepTo(50);
                 if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
                 pb.stepTo(75);
@@ -217,6 +216,7 @@ public class D3CO implements Runnable {
         // Load ROI Data:
         List<double[]> nonEuclideanROI = Geo.file2DoubleList(ROI_PATH);
         double roiSurface = Geo.computeNonEuclideanSurface2(nonEuclideanROI);
+        Log.debug("ROI Surface: " + roiSurface);
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -303,7 +303,7 @@ public class D3CO implements Runnable {
 
                 for (double surface : surfaceValues) {
                     sb.append(",");
-                    double percentage = Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
+                    double percentage = (surface / roiSurface) * 100D; // Math.round(((surface / roiSurface) * 100.00000) * 100000d) / 100000d;
                     sb.append(percentage);
                 }
 
@@ -552,8 +552,8 @@ public class D3CO implements Runnable {
             double lambda2 = Geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double distance = Geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
-            // FIXME ADD MARGIN
-            if (distance >= (lambda1 + lambda2) * 1.02) {
+            // FIXME ADDED MARGIN
+            if (distance >= (lambda1 + lambda2) * 1.01) {
                 return false;
             }
         }
