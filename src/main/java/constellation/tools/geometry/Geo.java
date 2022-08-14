@@ -18,25 +18,26 @@ public class Geo {
 
     public static final double EARTH_RADIUS_EQ_M = 6378135.0D;
     public static final double WGS84_EQ_RADIUS_M = 6378137.0D;
-    public static final double WGS84_F = 1 / 298.257223563;
-    public static final double WGS84_E2 = 0.00669437999014;
-    public static final double WGS84_E = 0.081819190842613;
+    public static final double WGS84_EQ_RADIUS_KM = 6378.137D;
+    public final double WGS84_F = 1 / 298.257223563;
+    public final double WGS84_E2 = 0.00669437999014;
+    public final double WGS84_E = 0.081819190842613;
 
-    private static final long POLAR_NO_ERROR = 0x0000;
-    private static final long POLAR_LAT_ERROR = 0x0001;
-    private static final long POLAR_LON_ERROR = 0x0002;
-    private static final long POLAR_ORIGIN_LAT_ERROR = 0x0004;
-    private static final long POLAR_ORIGIN_LON_ERROR = 0x0008;
-    public static final long POLAR_EASTING_ERROR = 0x0010;
-    public static final long POLAR_NORTHING_ERROR = 0x0020;
-    private static final long POLAR_A_ERROR = 0x0040;
-    private static final long POLAR_INV_F_ERROR = 0x0080;
-    public static final long POLAR_RADIUS_ERROR = 0x0100;
+    private final long POLAR_NO_ERROR = 0x0000;
+    private final long POLAR_LAT_ERROR = 0x0001;
+    private final long POLAR_LON_ERROR = 0x0002;
+    private final long POLAR_ORIGIN_LAT_ERROR = 0x0004;
+    private final long POLAR_ORIGIN_LON_ERROR = 0x0008;
+    public final long POLAR_EASTING_ERROR = 0x0010;
+    public final long POLAR_NORTHING_ERROR = 0x0020;
+    private final long POLAR_A_ERROR = 0x0040;
+    private final long POLAR_INV_F_ERROR = 0x0080;
+    public final long POLAR_RADIUS_ERROR = 0x0100;
 
-    private static final double PI = 3.14159265358979323;
-    private static final double PI_OVER_2 = PI / 2.0;
-    private static final double PI_Over_4 = PI / 4.0;
-    private static final double TWO_PI = 2.0 * PI;
+    private final double PI = 3.14159265358979323;
+    private final double PI_OVER_2 = PI / 2.0;
+    private final double PI_Over_4 = PI / 4.0;
+    private final double TWO_PI = 2.0 * PI;
 
     /* Ellipsoid Parameters, default to WGS 84  */
     private double Polar_a = 6378137.0;                    /* Semi-major axis of ellipsoid in meters  */
@@ -77,7 +78,7 @@ public class Geo {
      * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
      * -1 if it contains the South Pole
      **/
-    public static int checkPoleInclusion(FOV FOV, double lambdaMax) {
+    public int checkPoleInclusion(FOV FOV, double lambdaMax) {
 
         if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), 90, 0) <= lambdaMax) {
             return 1;
@@ -96,7 +97,7 @@ public class Geo {
      * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
      * -1 if it contains the South Pole
      **/
-    public static int checkPoleInclusion(double refLat, double refLon, double lambdaMax) {
+    public int checkPoleInclusion(double refLat, double refLon, double lambdaMax) {
 
         if (computeGeodesic(refLat, refLon, 90, 0) <= lambdaMax) {
             return 1;
@@ -115,7 +116,7 @@ public class Geo {
      * @param r2 the second FOV
      * @return Double the computed angular distance in degrees
      **/
-    public static double computeGeodesic(FOV r1, FOV r2) {
+    public double computeGeodesic(FOV r1, FOV r2) {
         return computeGeodesic(r1.getSspLat(), r1.getSspLon(), r2.getSspLat(), r2.getSspLon());
     }
 
@@ -128,7 +129,7 @@ public class Geo {
      * @param lon2 the second FOV's longitude
      * @return a double value for the computed angular distance, in degrees
      **/
-    public static double computeGeodesic(double lat1, double lon1, double lat2, double lon2) {
+    public double computeGeodesic(double lat1, double lon1, double lat2, double lon2) {
         GeodesicData g = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2,
                 GeodesicMask.DISTANCE);
         return g.a12;
@@ -141,7 +142,7 @@ public class Geo {
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
      **/
-    public static double computeNonEuclideanSurface(List<Pair> pairList) { // TODO: REMOVE IF 2 WORKS
+    public double computeNonEuclideanSurface(List<Pair> pairList) { // TODO: REMOVE IF 2 WORKS
 
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
@@ -162,7 +163,7 @@ public class Geo {
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
      **/
-    public static double computeNonEuclideanSurface2(List<double[]> pairList) {
+    public double computeNonEuclideanSurface2(List<double[]> pairList) {
 
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
@@ -176,7 +177,6 @@ public class Geo {
     }
 
     // TODO change getLambda name and add a method without the threshold
-
     /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
      * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
@@ -185,7 +185,7 @@ public class Geo {
      * @param visibilityThreshold the height above horizon visibility threshold in degrees
      * @return Te maximum Earth Central Angle for the access area, in degrees
      **/
-    public static double getLambdaMax(double semiMajorAxis, double visibilityThreshold) {
+    public double getLambdaMax(double semiMajorAxis, double visibilityThreshold) {
         return getLambdaMax(semiMajorAxis, 0, visibilityThreshold);
     }
 
@@ -198,7 +198,7 @@ public class Geo {
      * @param visibilityThreshold the height above horizon visibility threshold in degrees
      * @return Te maximum Earth Central Angle for the access area, in degrees
      **/
-    public static double getLambdaMax(double semiMajorAxis, double eccentricity, double visibilityThreshold) {
+    public double getLambdaMax(double semiMajorAxis, double eccentricity, double visibilityThreshold) {
 
         double hMax = ((1 + eccentricity) * semiMajorAxis) - Utils.EARTH_RADIUS_EQ_M;
         double etaMax = Math.asin((Utils.EARTH_RADIUS_EQ_M * Math.cos(Math.toRadians(visibilityThreshold))) / (Utils.EARTH_RADIUS_EQ_M + hMax));
@@ -216,7 +216,7 @@ public class Geo {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public static List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 
@@ -311,12 +311,12 @@ public class Geo {
         return coordinates;
     }
 
-    /**
+    /** // TODO ship this to Utils
      * Reads a file containing asset(s) parameter(s) and returns a list of objects accordingly
      *
      * @return List<Pair>
      */
-    public static List<double[]> file2DoubleList(String fileName) {
+    public List<double[]> file2DoubleList(String fileName) {
 
         List<double[]> pairList = new ArrayList<>();
         var file = new File(fileName);
@@ -339,7 +339,7 @@ public class Geo {
         return pairList;
     }
 
-    public static int checkPoleInclusion(double[] coordinate, List<double[]> polygon) {
+    public int checkPoleInclusion(double[] coordinate, List<double[]> polygon) {
 
         // First transform the polygon into a Path2D
         Path2D.Double path2D = new Path2D.Double();
@@ -365,7 +365,7 @@ public class Geo {
 
     }
 
-    public static double[] computeAntipode(double lat, double lon) {
+    public double[] computeAntipode(double lat, double lon) {
 
         double[] antipode = new double[2];
         antipode[0] = -1 * antipode[0];
@@ -380,6 +380,100 @@ public class Geo {
         }
 
         return antipode;
+
+    }
+
+    public List<double[]> toEuclideanPlane(List<double[]> nonEuclideanPolygon, double referenceLat, double referenceLon) {
+
+        List<double[]> euclideanPolygon = new ArrayList<>();
+
+        // Transform reference GCS coordinates to radians
+        final double referenceLatRads = Math.toRadians(referenceLat);
+        final double referenceLonRads = Math.toRadians(referenceLon);
+
+        setPolarStereographicParameters(WGS84_EQ_RADIUS_M, WGS84_F, referenceLatRads,
+                referenceLonRads, 0, 0);
+
+        for (double[] nePair : nonEuclideanPolygon) {
+
+            double lat = Math.toRadians(nePair[0]);
+            double lon = Math.toRadians(nePair[1]);
+            convertGeodeticToPolarStereographic(lat, lon);
+            euclideanPolygon.add(new double[]{this.Easting, this.Northing});
+
+        }
+
+        return euclideanPolygon;
+
+    }
+
+    /**
+     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
+     **/
+    public static double[] toStereo(double lat, double lon, double referenceLatRads, double referenceLonRads) {
+
+        double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+
+        double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
+                Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+        double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
+        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+        return new double[]{xStereo, yStereo};
+
+    }
+
+    public List<double[]> toNonEuclideanPlane(List<double[]> euclideanPolygon, double referenceLat, double referenceLon) {
+
+        List<double[]> GCSPolygon = new ArrayList<>();
+
+        // Transform to radians
+        double referenceLatRads = Math.toRadians(referenceLat);
+        double referenceLonRads = Math.toRadians(referenceLon);
+
+        setPolarStereographicParameters(WGS84_EQ_RADIUS_M, WGS84_F, referenceLatRads,
+                referenceLonRads, 0, 0);
+
+        for (double[] ePair : euclideanPolygon) {
+
+            double xStereo = ePair[0];
+            double yStereo = ePair[1];
+
+            convertPolarStereographicToGeodetic(xStereo, yStereo);
+
+//
+//
+//            double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
+//
+//            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+//
+//            double c = 2 * Math.atan2(rho, 2.0 * localRadius);
+//            double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
+//            double lon;
+//
+//            // For exactly the poles, avoid indeterminate points in the equations
+//            if (referenceLat == 90.0) {
+//                lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
+//            } else if (referenceLat == -90.0) {
+//                lon = referenceLonRads + Math.atan2(xStereo, yStereo);
+//            } else {
+//                lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
+//                        - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
+//            }
+//
+//            // Go back to degrees
+//            lat = Math.toDegrees(lat);
+//            lon = Math.toDegrees(lon);
+//
+//            while (lon < -180D) lon += 360;
+//            while (lon > 180D) lon -= 360;
+
+            GCSPolygon.add(new double[]{Math.toDegrees(this.Latitude), Math.toDegrees(this.Longitude)});
+
+        }
+
+        return GCSPolygon;
 
     }
 
@@ -709,7 +803,7 @@ public class Geo {
      * @param h     the height in meters
      * @return double the geodetic latitude
      **/
-    public static double gcLat2gdLat(double gcLat, double h) {
+    public double gcLat2gdLat(double gcLat, double h) {
 
         double a = Math.pow(Math.sin(gcLat), 2);
         double rn = EARTH_RADIUS_EQ_M / (Math.sqrt(1 - WGS84_E2 * a));
@@ -724,7 +818,7 @@ public class Geo {
      * @param gcLat the geocentric latitude in radians
      * @return double the geodetic latitude
      **/
-    public static double gcLat2gdLat(double gcLat) {
+    public double gcLat2gdLat(double gcLat) {
         return Math.atan2(Math.tan(gcLat), (1 - WGS84_E2));
     }
 
@@ -734,7 +828,7 @@ public class Geo {
      * @param gcLat the geocentric latitude in degrees
      * @return double the geodetic latitude
      **/
-    public static double gcLat2gdLatD(double gcLat) { // TODO normalize either degrees or radians usage
+    public double gcLat2gdLatD(double gcLat) { // TODO normalize either degrees or radians usage
         double gcLatRad = Math.toRadians(gcLat);
         return Math.toDegrees(gcLat2gdLat(gcLatRad));
     }
@@ -745,7 +839,7 @@ public class Geo {
      * @param lat the geodetic latitude in radians
      * @return double the geocentric latitude in radians
      **/
-    public static double gdLat2gcLat(double lat) { // TODO normalize either degrees or radians usage
+    public double gdLat2gcLat(double lat) { // TODO normalize either degrees or radians usage
         return Math.atan((1 - WGS84_E2) * Math.tan(lat));
     }
 
@@ -755,18 +849,18 @@ public class Geo {
      * @param gdLat the geodetic latitude in degrees
      * @return double the geocentric latitude
      **/
-    public static double gdLat2gcLatD(double gdLat) { // TODO normalize either degrees or radians usage
+    public double gdLat2gcLatD(double gdLat) { // TODO normalize either degrees or radians usage
         double gdLatRad = Math.toRadians(gdLat);
         return Math.toDegrees(gdLat2gcLat(gdLatRad));
     }
 
-    public static double conformal2latD(double confLat) {
+    public double conformal2latD(double confLat) {
 
         return Math.toDegrees(conformal2lat(Math.toRadians(confLat)));
 
     }
 
-    public static double conformal2lat(double confLat) {
+    public double conformal2lat(double confLat) {
 
         return confLat + (Math.pow(WGS84_E, 2) / 2 + 5 * Math.pow(WGS84_E, 4) / 24 + 1 * Math.pow(WGS84_E, 6) / 12 + 13 * Math.pow(WGS84_E, 8) / 360) * Math.sin(2 * confLat)
                 + (7 * Math.pow(WGS84_E, 4) / 48 + 29 * Math.pow(WGS84_E, 6) / 240 + 811 * Math.pow(WGS84_E, 8) / 11520) * Math.sin(4 * confLat)
@@ -775,13 +869,13 @@ public class Geo {
 
     }
 
-    public static double lat2ConformalD(double confLat) {
+    public double lat2ConformalD(double confLat) {
 
         return Math.toDegrees(lat2conformal(Math.toRadians(confLat)));
 
     }
 
-    public static double lat2conformal(double sphericalLat) {
+    public double lat2conformal(double sphericalLat) {
 
         return sphericalLat + (Math.pow(WGS84_E, 2) / 2 + 5 * Math.pow(WGS84_E, 4) / 24 + 3 * Math.pow(WGS84_E, 6) / 32 + 281 * Math.pow(WGS84_E, 8) / 5760) * Math.sin(2 * sphericalLat)
                 + (5 * Math.pow(WGS84_E, 4) / 48 + 7 * Math.pow(WGS84_E, 6) / 80 + 697 * Math.pow(WGS84_E, 8) / 11520) * Math.sin(4 * sphericalLat)

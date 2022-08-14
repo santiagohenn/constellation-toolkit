@@ -1,5 +1,6 @@
 package constellation.tools.math;
 
+import constellation.tools.geometry.Geo;
 import satellite.tools.utils.Utils;
 
 import java.util.ArrayList;
