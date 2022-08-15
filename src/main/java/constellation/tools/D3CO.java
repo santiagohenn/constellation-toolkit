@@ -527,8 +527,11 @@ public class D3CO implements Runnable {
             simulation.setSatellite(satellite);
             Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
 
+            // TODO: If new procedure works replace with computePVDAt
+
             double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
             List<double[]> poly = geo.drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
+
 
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), poly);
             FOV.setPolygonCoordinates(poly);
