@@ -6,6 +6,7 @@ import com.menecats.polybool.models.Polygon;
 import constellation.tools.geometry.AAP;
 import constellation.tools.geometry.FOV;
 import constellation.tools.geometry.Geo;
+import constellation.tools.geometry.OblateFOV;
 import constellation.tools.math.Combination;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
@@ -47,7 +48,7 @@ public class D3CO implements Runnable {
     private final boolean SAVE_EUCLIDEAN = Boolean.parseBoolean((String) prop.get("save_euclidean"));
     private final boolean SAVE_GEOGRAPHIC = Boolean.parseBoolean((String) prop.get("save_geographic"));
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
-    private final double POLYGON_SEGMENTS = Double.parseDouble((String) prop.get("polygon_segments"));
+    private final int POLYGON_SEGMENTS = Integer.parseInt((String) prop.get("polygon_segments"));
     private final double POLYGON_EPSILON = Double.parseDouble((String) prop.get("polygon_epsilon"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
 
@@ -530,8 +531,9 @@ public class D3CO implements Runnable {
             // TODO: If new procedure works replace with computePVDAt
 
             double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
-            List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
-
+            // List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
+            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX()/1000.0, eph.getPosY()/1000.0, eph.getPosZ()/1000.0,
+                    VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), eph.getLatitude(), eph.getLongitude(), poly);
             FOV.setPolygonCoordinates(poly);

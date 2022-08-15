@@ -1,9 +1,7 @@
 package constellation.tools.geometry;
 
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
-import org.jline.utils.Log;
-import satellite.tools.assets.Asset;
-import satellite.tools.utils.Utils;
+import satellite.tools.utils.Log;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,8 +80,6 @@ public class OblateFOV {
 
         List<double[]> coordinates1 = new ArrayList<>(segments);
         List<double[]> coordinates2 = new ArrayList<>(2 * segments);
-
-        int it = 0;
 
         double step = Math.PI / (segments - 1);
         for (double psi = 0; psi <= Math.PI * 1.00001; psi += step) {
@@ -252,16 +248,6 @@ public class OblateFOV {
             coordinates1.add(new double[]{P1_3D.getX(), P1_3D.getY(), P1_3D.getZ()});
             coordinates2.add(new double[]{P2_3D.getX(), P2_3D.getY(), P2_3D.getZ()});
 
-//            System.out.println(P1_3D);
-//            System.out.println(P2_3D);
-
-            it++;
-
-            if (it == 48) {
-                flag = true;
-                Log.debug("breakpoint");
-            }
-
         }
 
         coordinates1.addAll(coordinates2);
@@ -362,6 +348,8 @@ public class OblateFOV {
 
         } else {
             Log.error("not considered alpha_SC case.");
+            Log.debug("alpha_SC: " + alpha_SC);
+            Log.debug("alpha_SC (deg): " + Math.toDegrees(alpha_SC));
         }
 
         double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
@@ -494,6 +482,8 @@ public class OblateFOV {
 
             } else {
                 Log.error("not considered alpha_SC case.");
+                Log.debug("alpha_SC: " + alpha_SC);
+                Log.debug("alpha_SC (deg): " + Math.toDegrees(alpha_SC));
             }
 
             double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
