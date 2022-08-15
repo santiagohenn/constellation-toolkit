@@ -1,16 +1,12 @@
 package constellation.tools.geometry;
 
-import gov.nasa.worldwind.geom.Angle;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.jline.utils.Log;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.lang.Math.cos;
-import static java.lang.Math.sin;
-import static java.lang.Math.sqrt;
-import static java.lang.Math.pow;
+import static java.lang.Math.*;
 
 public class OblateFOV {
 
@@ -21,10 +17,12 @@ public class OblateFOV {
     public static final double a = 6378.137D;
     public static final double a2 = Math.pow(a, 2);
     public static final double a4 = Math.pow(a, 4); // TODO Replace with a2^2
-    public static final double b = 6378.137D * (1 - WGS84_F);
+    public static final double b = a * (1 - WGS84_F);
     public static final double b2 = Math.pow(b, 2);
     public static final double b4 = Math.pow(b, 4);
     public static final double E2 = Math.pow(WGS84_E, 2);
+
+    private static boolean flag = false;
 
     public static List<double[]> drawConicWithSensor(double x, double y, double z, double eta, int segments) {
 
@@ -48,6 +46,8 @@ public class OblateFOV {
         double lon_nadir = Math.atan2(o.getY(), o.getX());
         double lat_nadir = Math.asin(o.getZ());
 
+        // TODO Check so far
+
         // Definition of the angles of the rotation matrix 321
         double phi = lon_nadir;
         double theta = -lat_nadir;
@@ -58,19 +58,37 @@ public class OblateFOV {
         // P1_in = zeros(N,3);
         // P2_in = zeros(N,3);
 
-        List<double[]> polygon = new ArrayList<>();
+        List<double[]> coordinates1 = new ArrayList<>(segments);
+        List<double[]> coordinates2 = new ArrayList<>(2 * segments);
 
-        for (double psi = 0; psi < Math.PI; psi += Math.PI / segments) {
+        int it = 0;
+
+        double step = Math.PI / (segments - 1);
+        for (double psi = 0; psi <= Math.PI * 1.00001; psi += step) {
+
+            if (psi > Math.PI) {
+                Log.warn("psi greater than PI");
+                psi = Math.PI;
+            }
 
             // Rotation matrix from Geocentric to horizon frame
             double[][] A_321 = {{cos(theta) * cos(phi), cos(theta) * sin(phi), -sin(theta)},
-                    {-cos(psi) * sin(phi) + sin(psi) * sin(theta) * cos(phi), cos(psi) * cos(phi) + sin(psi) * sin(theta) * sin(phi), sin(psi) * cos(theta)},
-                    {sin(psi) * sin(phi) + sin(theta) * cos(phi) * cos(psi), -sin(psi) * cos(phi) + sin(theta) * sin(phi) * cos(psi), cos(theta) * cos(psi)}};
+                    {-cos(psi) * sin(phi) + sin(psi) * sin(theta) * cos(phi), cos(psi) * cos(phi) + sin(psi) * sin(theta) * sin(phi),
+                            sin(psi) * cos(theta)},
+                    {sin(psi) * sin(phi) + sin(theta) * cos(phi) * cos(psi), -sin(psi) * cos(phi) + sin(theta) * sin(phi) * cos(psi),
+                            cos(theta) * cos(psi)}};
+
+//            System.out.println("--------- " + psi);
+//            System.out.println(A_321[0][0] + "," + A_321[0][1] + "," + A_321[0][2]);
+//            System.out.println(A_321[1][0] + "," + A_321[1][1] + "," + A_321[1][2]);
+//            System.out.println(A_321[2][0] + "," + A_321[2][1] + "," + A_321[2][2]);
+//            System.out.println("---------");
 
             Vector3D n_prime = getNPrime(A_321);
 
             // Distance of the plane w.r. to the origin
-            double d = n_prime.getX() * x + n_prime.getY() * y + n_prime.getZ() * z;
+//            double d = n_prime.getX() * x + n_prime.getY() * y + n_prime.getZ() * z;
+            double d = n_prime.dotProduct(pos);
 
             // Set the components of the normal to the ellipse plane
             double n1_prime = n_prime.getX();
@@ -107,11 +125,12 @@ public class OblateFOV {
 
                 // Ellipse 's semi-major axis direction in the Geocentric frame
                 e = new Vector3D(n2_prime, -n1_prime, 0);
-                e.scalarMultiply(1 / sqrt(arg));
+                e = e.scalarMultiply(1 / sqrt(arg));
 
                 // Ellipse 's semi-minor axis direction in the Geocentric frame
                 u = new Vector3D(-n1_prime * n3_prime, -n2_prime * n3_prime, arg);
-                u.scalarMultiply(-1 / sqrt(arg));
+                u = u.scalarMultiply(-1 / sqrt(arg));
+
             }
 
             //  Position vector of the S/C w.r.to the ellipse's centre
@@ -123,13 +142,16 @@ public class OblateFOV {
                     {n_prime.getX(), n_prime.getY(), n_prime.getZ()}};
 
             // Position vector of the S/C w.r.to the ellipse centre aRot*r_line;
-            Vector3D r_line_local = new Vector3D(aRot[0][0] * r_line.getX() + aRot[0][1] * r_line.getY()
-                    + aRot[0][2] * r_line.getZ(), aRot[1][0] * r_line.getX() + aRot[1][1] * r_line.getY()
-                    + aRot[1][2] * r_line.getZ(), aRot[2][0] * r_line.getX() + aRot[2][1] * r_line.getY()
-                    + aRot[2][2] * r_line.getZ());
+            Vector3D r_line_local =
+                    new Vector3D(aRot[0][0] * r_line.getX() + aRot[0][1] * r_line.getY() + aRot[0][2] * r_line.getZ(),
+                                aRot[1][0] * r_line.getX() + aRot[1][1] * r_line.getY() + aRot[1][2] * r_line.getZ(),
+                                aRot[2][0] * r_line.getX() + aRot[2][1] * r_line.getY() + aRot[2][2] * r_line.getZ());
 
             // Definition of the S/C coordinates in the local frame
             double e_sc = r_line_local.getX();
+//            if (abs(e_sc) < 1E-10) {
+//                e_sc = 0;
+//            }
             double u_sc = r_line_local.getY();
 
             // Coefficients derived from the normalisation of the second-degree
@@ -160,6 +182,7 @@ public class OblateFOV {
                     + Math.pow(a_tilde, 2) * Math.pow(m_T1, 2));
             double e_T2 = (m_T2 * (-q_T2) * Math.pow(a_tilde, 2)) / (Math.pow(b_tilde, 2)
                     + Math.pow(a_tilde, 2) * Math.pow(m_T2, 2));
+
             double u_T1 = m_T1 * e_T1 + q_T1;
             double u_T2 = m_T2 * e_T2 + q_T2;
             Vector3D r_T1 = new Vector3D(e_T1, u_T1, 0);
@@ -191,15 +214,44 @@ public class OblateFOV {
 
             // Compute the points in the local frame according to the method
             // Using eta
-            List<double[]> coordinates = computeHalfAperture(a_tilde, b_tilde, alpha_SC, eta, eta_hor_1, eta_hor_2, r_line_local);
+            List<double[]> vectors = computeHalfAperture(a_tilde, b_tilde, alpha_SC, eta, eta_hor_1, eta_hor_2, r_line_local);
+
+            // Inverse transformation from local to Geocentric inertial frame
+            double[] P1 = vectors.get(0);
+            double[] P2 = vectors.get(1);
+
+            Vector3D P1_3D = new Vector3D(aRot[0][0] * P1[0] + aRot[1][0] * P1[1] + aRot[2][0] * P1[2],
+                            aRot[0][1] * P1[0] + aRot[1][1] * P1[1] + aRot[2][1] * P1[2],
+                            aRot[0][2] * P1[0] + aRot[1][2] * P1[1] + aRot[2][2] * P1[2]);
+
+            Vector3D P2_3D = new Vector3D(aRot[0][0] * P2[0] + aRot[1][0] * P2[1] + aRot[2][0] * P2[2],
+                    aRot[0][1] * P2[0] + aRot[1][1] * P2[1] + aRot[2][1] * P2[2],
+                    aRot[0][2] * P2[0] + aRot[1][2] * P2[1] + aRot[2][2] * P2[2]);
+
+            // Relative reference systems formulation to align the origin
+            P1_3D.add(s);
+            P2_3D.add(s);
+
+            coordinates1.add(new double[]{P1_3D.getX(), P1_3D.getY(), P1_3D.getZ()});
+            coordinates2.add(new double[]{P2_3D.getX(), P2_3D.getY(), P2_3D.getZ()});
+
+//            System.out.println(P1_3D);
+//            System.out.println(P2_3D);
 
             // Using th (Not implemented yet)
             // List<double[]> coordinates = computeWithElevation(a_tilde,b_tilde,alpha_SC,eta_hor_1,eta_hor_2,epsilon,tol,r_line_local);
 
+            it++;
+
+            if (it == 48) {
+                flag = true;
+                Log.debug("breakpoint");
+            }
 
         }
 
-        return polygon;
+        coordinates1.addAll(coordinates2);
+        return coordinates1;
 
     }
 
@@ -233,90 +285,111 @@ public class OblateFOV {
             eta_2 = eta;
         }
 
+        // Angle of the secants w.r.to the semi-major axis direction
+        double alpha_P1 = (alpha_SC - eta_1);
+        double alpha_P2 = (alpha_SC + eta_2);
+
+        //Slopes of the two secants
+        double m_P1 = Math.tan(alpha_P1);
+        double m_P2 = Math.tan(alpha_P2);
+
+        //Coefficients to normalise the equation and reduce the error
+        double coeff2_1 = (2 * m_P1 * pow(a_tilde, 2) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
+        double coeff3_1 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
+
+        double coeff2_2 = (2 * m_P2 * pow(a_tilde, 2) * (u_sc - m_P2 * e_sc)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
+        double coeff3_2 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P2 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
+
+        //Discriminant of the second-degree equation
+        double Delta_P1 = pow(coeff2_1, 2) - 4 * coeff3_1;
+        double Delta_P2 = pow(coeff2_2, 2) - 4 * coeff3_2;
+
+        double e_P1 = 0, e_P2 = 0;
         // First case
         if (alpha_SC >= 0 && alpha_SC <= Math.PI / 2) { // First Quadrant
-
-            // Angle of the secants w.r.to the semi-major axis direction
-            double alpha_P1 = (alpha_SC - eta_1);
-            double alpha_P2 = (alpha_SC + eta_2);
-
-            //Slopes of the two secants
-            double m_P1 = Math.tan(alpha_P1);
-            double m_P2 = Math.tan(alpha_P2);
-
-            //Coefficients to normalise the equation and reduce the error
-            double coeff2_1 = (2 * m_P1 * pow(a_tilde, 2) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
-            double coeff3_1 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
-
-            double coeff2_2 = (2 * m_P2 * pow(a_tilde, 2) * (u_sc - m_P2 * e_sc)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
-            double coeff3_2 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P2 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
-
-            //Discriminant of the second-degree equation
-            double Delta_P1 = pow(coeff2_1, 2) - 4 * coeff3_1;
-            double Delta_P2 = pow(coeff2_2, 2) - 4 * coeff3_2;
-
-            double e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
-            double e_P2;
+            e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
 
             //Selection of the two right solutions among the possible four
             if (alpha_P2 <= Math.PI / 2) {
                 e_P2 = (-coeff2_2 + sqrt(Delta_P2)) / 2;
-            }  else {
+            } else {
                 e_P2 = (-coeff2_2 - sqrt(Delta_P2)) / 2;
             }
 
-            double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
-            double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
-
-            //Points in vector form
-            var P1 = new Vector3D(e_P1, u_P1, 0);
-            var P2 = new Vector3D(e_P2, u_P2, 0);
-
-        }
-
-        // Second case
-        if  (alpha_SC > Math.PI/2 && alpha_SC <= Math.PI) {   // Second Quadrant
-
-            // Angle of the secants w.r.to the semi-major axis direction
-            double alpha_P1 = (alpha_SC - eta_1);
-            double alpha_P2 = (alpha_SC + eta_2);
-
-            // Slopes of the two secants
-            double m_P1 = Math.tan(alpha_P1);
-            double m_P2 = Math.tan(alpha_P2);
-
-            // Coefficients to normalise the equation and reduce the error
-            double coeff2_1 = (2 * m_P1 * pow(a_tilde, 2) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
-            double coeff3_1 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
-
-            double coeff2_2 = (2 * m_P2 * pow(a_tilde, 2) * (u_sc - m_P2 * e_sc)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
-            double coeff3_2 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P2 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
-
-            // Discriminant of the second-degree equation
-            double Delta_P1 = pow(coeff2_1, 2) - 4 * coeff3_1;
-            double Delta_P2 = pow(coeff2_2, 2) - 4 * coeff3_2;
-
-            double e_P1;
-
+        } else if (alpha_SC > Math.PI / 2 && alpha_SC <= Math.PI) {   // Second Quadrant
             //Selection of the two right solutions among the possible four
             if (alpha_P2 <= Math.PI / 2) {
                 e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
-            }  else {
-                e_P1 = (-coeff2_2 - sqrt(Delta_P2)) / 2;
+            } else {
+                e_P1 = (-coeff2_1 - sqrt(Delta_P1)) / 2;
             }
 
-            double e_P2 = (-coeff2_2 - sqrt(Delta_P2))/2;
-            double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
-            double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
+            e_P2 = (-coeff2_2 - sqrt(Delta_P2)) / 2;
 
-            //Points in vector form
-            var P1 = new Vector3D(e_P1, u_P1, 0);
-            var P2 = new Vector3D(e_P2, u_P2, 0);
+        } else if (alpha_SC >= -Math.PI && alpha_SC <= -Math.PI / 2) {   // Third Quadrant
+            e_P1 = (-coeff2_1 - sqrt(Delta_P1)) / 2;
 
+            //Selection of the two right solutions among the possible four
+            if (alpha_P2 <= -Math.PI / 2) {
+                e_P2 = (-coeff2_2 - sqrt(Delta_P2)) / 2;
+            } else {
+                e_P2 = (-coeff2_2 + sqrt(Delta_P2)) / 2;
+            }
+
+        } else if (alpha_SC > -Math.PI/2 && alpha_SC < 0) {   // Fourth Quadrant
+            //Selection of the two right solutions among the possible four
+            if (alpha_P2 <= Math.PI / 2) {
+                e_P1 = (-coeff2_1 - sqrt(Delta_P1)) / 2;
+            } else {
+                e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
+            }
+
+            e_P2 = (-coeff2_2 + sqrt(Delta_P2)) / 2;
+
+        } else {
+            Log.error("not considered alpha_SC case.");
         }
 
+        double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
+        double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
 
+        // Points in vector form
+        var P1 = new Vector3D(e_P1, u_P1, 0);
+        var P2 = new Vector3D(e_P2, u_P2, 0);
 
+        //// Determination of the tangents in P1 and P2
+        double m_t_P1, m_t_P2;
+
+        // Tangent slope
+        var v0 = pow(a_tilde, 2) * sqrt(1 - pow((e_P1 / a_tilde), 2));
+        var v1 = pow(a_tilde, 2) * sqrt(1 - pow((e_P2 / a_tilde), 2));
+
+        if (u_P1 >= 0) {     // Selection of the semi-ellipse
+            m_t_P1 = (-b_tilde*e_P1)/ v0;
+        } else {
+            m_t_P1 = (b_tilde*e_P1)/ v0;
+        }
+
+        if (u_P2 >= 0) {
+            m_t_P2 = (-b_tilde*e_P2)/ v1;
+        } else {
+            m_t_P2 = (b_tilde*e_P2)/ v1;
+        }
+
+        // Elevation angle computation: angle between two lines
+        var epsilon_1 = Math.atan((-m_t_P1 + m_P1)/(1 + m_t_P1*m_P1));
+        var epsilon_2 = Math.atan((m_t_P2 - m_P2)/(1 + m_t_P2*m_P2));
+
+        // Conversion into degrees
+        epsilon_1 = Math.toDegrees(epsilon_1);
+        epsilon_2 = Math.toDegrees(epsilon_2);
+
+        coordinates.add(new double[]{P1.getX(), P1.getY(), P1.getZ()});
+        coordinates.add(new double[]{P2.getX(), P2.getY(), P2.getZ()});
+
+        if (flag) {
+            flag = false;
+        }
 
         return coordinates;
 
