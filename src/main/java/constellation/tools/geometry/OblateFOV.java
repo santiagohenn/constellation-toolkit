@@ -46,17 +46,9 @@ public class OblateFOV {
         double lon_nadir = Math.atan2(o.getY(), o.getX());
         double lat_nadir = Math.asin(o.getZ());
 
-        // TODO Check so far
-
         // Definition of the angles of the rotation matrix 321
         double phi = lon_nadir;
         double theta = -lat_nadir;
-
-        // double psi = linspace(0,pi,N);
-
-        // Initialisation of the variables
-        // P1_in = zeros(N,3);
-        // P2_in = zeros(N,3);
 
         List<double[]> coordinates1 = new ArrayList<>(segments);
         List<double[]> coordinates2 = new ArrayList<>(2 * segments);
@@ -78,16 +70,8 @@ public class OblateFOV {
                     {sin(psi) * sin(phi) + sin(theta) * cos(phi) * cos(psi), -sin(psi) * cos(phi) + sin(theta) * sin(phi) * cos(psi),
                             cos(theta) * cos(psi)}};
 
-//            System.out.println("--------- " + psi);
-//            System.out.println(A_321[0][0] + "," + A_321[0][1] + "," + A_321[0][2]);
-//            System.out.println(A_321[1][0] + "," + A_321[1][1] + "," + A_321[1][2]);
-//            System.out.println(A_321[2][0] + "," + A_321[2][1] + "," + A_321[2][2]);
-//            System.out.println("---------");
-
             Vector3D n_prime = getNPrime(A_321);
 
-            // Distance of the plane w.r. to the origin
-//            double d = n_prime.getX() * x + n_prime.getY() * y + n_prime.getZ() * z;
             double d = n_prime.dotProduct(pos);
 
             // Set the components of the normal to the ellipse plane
@@ -390,6 +374,18 @@ public class OblateFOV {
         if (flag) {
             flag = false;
         }
+
+        return coordinates;
+
+    }
+
+    public static List<double[]> computeWithElevation(double a_tilde, double b_tilde, double alpha_SC,
+                                                      double eta_hor_1, double eta_hor_2, double epsilon,
+                                                      double tol, Vector3D r_line_local) {
+
+        List<double[]> coordinates = new ArrayList<>();
+
+
 
         return coordinates;
 
