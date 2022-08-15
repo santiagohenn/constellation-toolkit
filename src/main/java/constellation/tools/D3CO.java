@@ -525,15 +525,15 @@ public class D3CO implements Runnable {
 
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
-            Ephemeris ephemeris = simulation.computeSSPAndGetEphemeris(date);
+            Ephemeris eph = simulation.computeSSPAndGetEphemeris(date);
 
             // TODO: If new procedure works replace with computePVDAt
 
             double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
-            List<double[]> poly = geo.drawCircularAAP(lambdaMax, ephemeris.getLatitude(), ephemeris.getLongitude(), POLYGON_SEGMENTS);
+            List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
 
 
-            FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), poly);
+            FOV FOV = new FOV(satellite.getId(), eph.getLatitude(), eph.getLongitude(), poly);
             FOV.setPolygonCoordinates(poly);
 
             double surface = geo.computeNonEuclideanSurface2(poly);

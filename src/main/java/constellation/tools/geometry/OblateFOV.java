@@ -1,8 +1,9 @@
 package constellation.tools.geometry;
 
-import com.google.inject.internal.Errors;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.jline.utils.Log;
+import satellite.tools.assets.Asset;
+import satellite.tools.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,9 +14,8 @@ public class OblateFOV {
 
     public static final double WGS84_F = 1 / 298.257223563;
     public static final double WGS84_E = 0.081819190842613;
-    public static final double WGS84_E2 = 0.00669437999014;
-    public static final double WGS84_EQ_RADIUS_M = 6378137.0D;
     public static final double a = 6378.137D;
+    public static final double a_m = 6378137.0D;
     public static final double a2 = Math.pow(a, 2);
     public static final double a4 = Math.pow(a, 4); // TODO Replace with a2^2
     public static final double b = a * (1 - WGS84_F);
@@ -24,6 +24,26 @@ public class OblateFOV {
     public static final double E2 = Math.pow(WGS84_E, 2);
 
     private static boolean flag = false;
+
+    public static List<double[]> drawLLAConic(double x, double y, double z, double eta, int segments) {
+        List<double[]> coordinates = drawConic(x, y, z, eta, 0, 0, segments, 0);
+        return toLLA(coordinates);
+    }
+
+    public static List<double[]> drawLLAConic(double x, double y, double z, double epsilon, double tol, int segments) {
+        List<double[]> coordinates = drawConic(x, y, z, 0, epsilon, tol, segments, 1);
+        return toLLA(coordinates);
+    }
+
+    private static List<double[]> toLLA(List<double[]> coordinates) {
+        coordinates.forEach(c -> {
+            double[] lla = ecef2llaD(c[0], c[1], c[2]);
+            c[0] = lla[0];
+            c[1] = lla[1];
+            c[2] = lla[2];
+        });
+        return coordinates;
+    }
 
     public static List<double[]> drawConic(double x, double y, double z, double eta, int segments) {
         return drawConic(x, y, z, eta, 0, 0, segments, 0);
@@ -69,7 +89,6 @@ public class OblateFOV {
         for (double psi = 0; psi <= Math.PI * 1.00001; psi += step) {
 
             if (psi > Math.PI) {
-                Log.warn("psi greater than PI");
                 psi = Math.PI;
             }
 
@@ -569,6 +588,30 @@ public class OblateFOV {
 
         return new Vector3D(nadirX, nadirY, nadirZ);
 
+    }
+
+    private static double[] ecef2llaD(double x, double y, double z) {
+        double[] lla = ecef2lla(x, y, z);
+        return new double[]{Math.toDegrees(lla[0]), Math.toDegrees(lla[1]), lla[2]};
+    }
+
+    private static double[] ecef2lla(double x, double y, double z) {
+
+        double ep = Math.sqrt((Math.pow(a, 2.0D) - b2) / b2);
+        double p = Math.sqrt(Math.pow(x, 2.0D) + Math.pow(y, 2.0D));
+        double th = Math.atan2(a * z, b * p);
+        double lon = Math.atan2(y, x);
+        double lat = Math.atan2(z + Math.pow(ep, 2.0D) * b * Math.pow(Math.sin(th), 3.0D), p - E2 * a * Math.pow(Math.cos(th), 3.0D));
+        double n = a / Math.sqrt(1.0D - E2 * Math.pow(Math.sin(lat), 2.0D));
+        double alt = p / Math.cos(lat) - n;
+        lon %= 6.283185307179586D;
+        lat %= 6.283185307179586D;
+        if (Math.sqrt(Math.pow(x, 2.0D) + Math.pow(y, 2.0D) + Math.pow(z, 2.0D)) <= 0.0D) {
+            lon = 0.0D;
+            lat = 0.0D;
+            alt = -6378135.0D;
+        }
+        return new double[]{lat, lon, alt};
     }
 
 }
