@@ -7,7 +7,6 @@ import constellation.tools.geometry.AAP;
 import constellation.tools.geometry.FOV;
 import constellation.tools.geometry.Geo;
 import constellation.tools.math.Combination;
-import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
 import org.orekit.data.DataContext;
@@ -200,7 +199,7 @@ public class D3CO implements Runnable {
                 pb.stepTo(25);
                 if (SAVE_EUCLIDEAN && !SAVE_SNAPSHOT) saveAAPs(euclideanAAPs, "e_polygons");
                 pb.stepTo(50);
-                if (SAVE_GEOGRAPHIC && SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
+                if (SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
                 pb.stepTo(75);
                 if (SAVE_EUCLIDEAN && SAVE_SNAPSHOT) saveAAPsAt(euclideanAAPs, "snapshot_e_polygons", SNAPSHOT);
                 pb.stepTo(100);
@@ -336,31 +335,42 @@ public class D3CO implements Runnable {
     private Polygon polyUnion(List<List<double[]>> unionQueue) {
 
         Polygon union = new Polygon();
+        double epsilon = POLYGON_EPSILON;
+        int tries = 0;
 
-        // Union of all ROI intersections
-        try {
-            Epsilon eps = epsilon(POLYGON_EPSILON);
-            Polygon result = polygon(unionQueue.get(0));
-            PolyBool.Segments segments = PolyBool.segments(eps, result);
-            for (int i = 1; i < unionQueue.size(); i++) {
-                PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(unionQueue.get(i)));
-                PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
-                segments = PolyBool.selectUnion(comb);
-            }
+        while (tries < 3) {
 
-            union = PolyBool.polygon(eps, segments);
+            // Union of all ROI intersections
+            try {
+                Epsilon eps = epsilon(epsilon);
+                Polygon result = polygon(unionQueue.get(0));
+                PolyBool.Segments segments = PolyBool.segments(eps, result);
 
-        } catch (IndexOutOfBoundsException e1) {
-            Log.error("IndexOutOfBoundsException " + e1.getMessage());
-            Log.error("polygons to be or list size: " + unionQueue.size());
-            unionQueue.forEach(region -> {
-                Log.error("Region " + unionQueue.indexOf(region) + " size: " + unionQueue.size());
-            });
-        } catch (RuntimeException e2) {
-            Log.error(e2.getMessage());
-            Log.error("RuntimeException " + unionQueue.size());
-            if (DEBUG_MODE) {
-                unionQueue.forEach(region -> Log.error("Region " + unionQueue.indexOf(region) + " size: " + unionQueue.size()));
+                for (int i = 1; i < unionQueue.size(); i++) {
+                    PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(unionQueue.get(i)));
+                    PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                    segments = PolyBool.selectUnion(comb);
+                }
+
+                union = PolyBool.polygon(eps, segments);
+
+                if (tries > 0) {
+                    Log.warn("Zero-length segment error recovered with epsilon " + epsilon);
+                }
+
+                break;
+
+            } catch (IndexOutOfBoundsException e1) {
+                Log.error("IndexOutOfBoundsException " + e1.getMessage());
+                Log.error("polygons to be or list size: " + unionQueue.size());
+            } catch (RuntimeException e2) {
+                Log.warn(e2.getMessage());
+                Log.warn("RuntimeException. Union size: " + unionQueue.size() + " - Increasing epsilon");
+                epsilon *= 10;
+                tries++;
+                if (tries == 3) {
+                    Log.error("Zero-length segment error could not be recovered.");
+                }
             }
         }
 
@@ -559,7 +569,7 @@ public class D3CO implements Runnable {
             double distance = geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
             // FIXME ADDED MARGIN
-            if (distance >= (lambda1 + lambda2) * 1.01) {
+            if (distance >= (lambda1 + lambda2)) {
                 return false;
             }
         }
@@ -599,6 +609,10 @@ public class D3CO implements Runnable {
      **/
     private List<double[]> intersectAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
 
+        if (polygonA.size() == 0 || polygonB.size() == 0) {
+            return new ArrayList<>();
+        }
+
         List<List<double[]>> regions1 = new ArrayList<>();
         regions1.add(polygonA);
 
@@ -609,16 +623,20 @@ public class D3CO implements Runnable {
         Polygon polyB = new Polygon(regions2);
         Polygon intersection = new Polygon();
 
-        if (polyA.getRegions().get(0).size() >= 3 && polyB.getRegions().get(0).size() >= 3) {
-            Epsilon eps = epsilon(POLYGON_EPSILON);
+        Epsilon eps = epsilon(POLYGON_EPSILON);
+
+        try {
+            intersection = PolyBool.intersect(eps, polyA, polyB);
+        } catch (RuntimeException e) {
+            eps = epsilon(POLYGON_EPSILON * 10);
             intersection = PolyBool.intersect(eps, polyA, polyB);
         }
 
-        if (intersection.getRegions().size() > 0) {
-            return intersection.getRegions().get(0);
-        } else {
+        if (intersection.getRegions().isEmpty()) {
             return new ArrayList<>();
         }
+
+        return intersection.getRegions().get(0);
 
     }
 

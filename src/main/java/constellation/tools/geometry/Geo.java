@@ -391,7 +391,7 @@ public class Geo {
         final double referenceLatRads = Math.toRadians(referenceLat);
         final double referenceLonRads = Math.toRadians(referenceLon);
 
-        setPolarStereographicParameters(WGS84_EQ_RADIUS_M, WGS84_F, referenceLatRads,
+        setPolarStereographicParameters(WGS84_EQ_RADIUS_KM, WGS84_F, referenceLatRads,
                 referenceLonRads, 0, 0);
 
         for (double[] nePair : nonEuclideanPolygon) {
@@ -432,7 +432,7 @@ public class Geo {
         double referenceLatRads = Math.toRadians(referenceLat);
         double referenceLonRads = Math.toRadians(referenceLon);
 
-        setPolarStereographicParameters(WGS84_EQ_RADIUS_M, WGS84_F, referenceLatRads,
+        setPolarStereographicParameters(WGS84_EQ_RADIUS_KM, WGS84_F, referenceLatRads,
                 referenceLonRads, 0, 0);
 
         for (double[] ePair : euclideanPolygon) {
