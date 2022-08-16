@@ -58,7 +58,7 @@ public class OblateFOV {
         Vector3D pos = new Vector3D(x, y, z);
 
         // n
-        Vector3D gcPos = pos.scalarMultiply(-1 / pos.getNorm());
+        Vector3D gcPos = pos.scalarMultiply(-1.0D / pos.getNorm());
 
         // Line-of-sight projection onto the Earth surface (nadir)
         Vector3D nadir = getNadir(pos, gcPos);
@@ -69,7 +69,7 @@ public class OblateFOV {
         // - axes parallel to the Geocentric Inertial frame
 
         // Opposite direction to the line of sight
-        Vector3D o = gcPos.scalarMultiply(-1);
+        Vector3D o = gcPos.scalarMultiply(-1D);
 
         // Determination of the geographic coordinates
         double lon_nadir = Math.atan2(o.getY(), o.getX());
@@ -112,10 +112,10 @@ public class OblateFOV {
                     ((b2 / a2) * n3_prime * d) / (1 - E2 * Math.pow(n3_prime, 2)));
 
             // Ellipse's semi-major axis
-            double a_tilde = a * sqrt(1 - Math.pow(d, 2) / (a2 * (1 - E2 * Math.pow(n3_prime, 2))));
+            double a_tilde = a * sqrt(1 - Math.pow(d, 2.0) / (a2 * (1 - E2 * Math.pow(n3_prime, 2))));
 
             // Ellipse's semi-minor axis
-            double b_tilde = b * (sqrt(1 - (Math.pow(d, 2) / a2) - E2 * Math.pow(n3_prime, 2))) / (1 - E2 * Math.pow(n3_prime, 2));
+            double b_tilde = b * (sqrt(1 - (Math.pow(d, 2.0) / a2) - E2 * Math.pow(n3_prime, 2))) / (1 - E2 * Math.pow(n3_prime, 2.0));
 
             Vector3D e;
             Vector3D u;
@@ -131,7 +131,7 @@ public class OblateFOV {
                 // Ellipse 's semi-major axis direction in the Geocentric frame
                 u = new Vector3D(0, -1, 0);
             } else {
-                var arg = Math.pow(n1_prime, 2) + Math.pow(n2_prime, 2);
+                var arg = Math.pow(n1_prime, 2.0) + Math.pow(n2_prime, 2.0);
 
                 // Ellipse 's semi-major axis direction in the Geocentric frame
                 e = new Vector3D(n2_prime, -n1_prime, 0);
@@ -139,7 +139,7 @@ public class OblateFOV {
 
                 // Ellipse 's semi-minor axis direction in the Geocentric frame
                 u = new Vector3D(-n1_prime * n3_prime, -n2_prime * n3_prime, arg);
-                u = u.scalarMultiply(-1 / sqrt(arg));
+                u = u.scalarMultiply(-1.00 / sqrt(arg));
 
             }
 
@@ -188,10 +188,10 @@ public class OblateFOV {
             double q_T2 = -m_T2 * e_sc + u_sc;
 
             // Horizon Points
-            double e_T1 = (m_T1 * (-q_T1) * Math.pow(a_tilde, 2)) / (Math.pow(b_tilde, 2)
-                    + Math.pow(a_tilde, 2) * Math.pow(m_T1, 2));
-            double e_T2 = (m_T2 * (-q_T2) * Math.pow(a_tilde, 2)) / (Math.pow(b_tilde, 2)
-                    + Math.pow(a_tilde, 2) * Math.pow(m_T2, 2));
+            double e_T1 = (m_T1 * (-q_T1) * Math.pow(a_tilde, 2.0)) / (Math.pow(b_tilde, 2.0)
+                    + Math.pow(a_tilde, 2.0) * Math.pow(m_T1, 2.0));
+            double e_T2 = (m_T2 * (-q_T2) * Math.pow(a_tilde, 2.0)) / (Math.pow(b_tilde, 2.0)
+                    + Math.pow(a_tilde, 2.0) * Math.pow(m_T2, 2.0));
 
             double u_T1 = m_T1 * e_T1 + q_T1;
             double u_T2 = m_T2 * e_T2 + q_T2;
@@ -217,6 +217,22 @@ public class OblateFOV {
             // Angle between the S/C line-of-sight and the the semi-major axis direction e
             double alpha_SC = Math.atan2(u_sc, e_sc);
 
+            if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
+                alpha_SC = PI / 2;
+            } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
+                alpha_SC = - PI / 2;
+            } else if (Math.abs(alpha_SC - PI) < 10E-15) {
+                alpha_SC = PI;
+            } else if (Math.abs(alpha_SC + PI) < 10E-15) {
+                alpha_SC = -PI;
+            }
+
+//            if ((alpha_SC - PI) < 10E-16) {
+//                alpha_SC = PI;
+//            } else if ((alpha_SC + PI) < 10E-16) {
+//                alpha_SC = -PI;
+//            }
+
             // Total horizon boresight angle
             double eta_hor = eta_hor_1 + eta_hor_2;
 
@@ -227,9 +243,9 @@ public class OblateFOV {
             if (type == 0) {    // Using eta
                 vectors = computeHalfAperture(a_tilde, b_tilde, alpha_SC, eta, eta_hor_1, eta_hor_2, r_line_local);
             } else if (type == 1) {     // Using th
-//                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
-//                vectors = computeWithElevationBisect(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
                 vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
+//                vectors = computeWithElevationBisect(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
+//                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
 
             }
 
@@ -259,7 +275,9 @@ public class OblateFOV {
 
     }
 
-    /**TESTED WITH -990.945443, -5817.571039, 3334.217811**/
+    /**
+     * TESTED WITH -990.945443, -5817.571039, 3334.217811
+     **/
     private static List<double[]> computeHalfAperture(double a_tilde, double b_tilde, double alpha_SC, double etaDeg,
                                                       double eta_hor_1, double eta_hor_2, Vector3D r_line_local) {
 
@@ -330,20 +348,21 @@ public class OblateFOV {
         double u_sc = r_line_local.getY();
 
         // Aperture angles initialisation
-        double eta_1 = eta_hor_1 - 0.0001 * PI / 180;
-        double eta_2 = eta_hor_2 - 0.0001 * PI / 180;
+        double eta_1 = eta_hor_1 - Math.toRadians(0.0001);
+        double eta_2 = eta_hor_2 - Math.toRadians(0.0001);
 
         // Errors and tolerance initialisation
         double err_1 = 1;
         double err_2 = 1;
 
         double e_P1 = 0, e_P2 = 0, u_P1 = 0, u_P2 = 0;
+        double alpha_P1 = 0, alpha_P2 = 0;
 
         while (err_1 > tol || err_2 > tol) {
 
             // Angle of the secants w.r.to the semi-major axis direction
-            double alpha_P1 = (alpha_SC - eta_1);
-            double alpha_P2 = (alpha_SC + eta_2);
+            alpha_P1 = (alpha_SC - eta_1);
+            alpha_P2 = (alpha_SC + eta_2);
 
             //Slopes of the two secants
             double m_P1 = Math.tan(alpha_P1);
@@ -385,8 +404,8 @@ public class OblateFOV {
     }
 
     public static List<double[]> computeWithElevationBisect(double a_tilde, double b_tilde, double alpha_SC,
-                                                      double eta_hor_1, double eta_hor_2, double epsilon,
-                                                      double tol, Vector3D r_line_local) {
+                                                            double eta_hor_1, double eta_hor_2, double epsilon,
+                                                            double tol, Vector3D r_line_local) {
 
         List<double[]> coordinates = new ArrayList<>(2);
 
@@ -432,19 +451,19 @@ public class OblateFOV {
             double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
 
             // Error update
-            double epsilon_1 = epsilons[0];
-            double epsilon_2 = epsilons[1];
+            eps1 = epsilons[0];
+            eps2 = epsilons[1];
 
-            // Conversion into degrees
-            eps1 = Math.toDegrees(epsilon_1);
-            eps2 = Math.toDegrees(epsilon_2);
+//            // Conversion into degrees
+//            eps1 = Math.toDegrees(epsilon_1);
+//            eps2 = Math.toDegrees(epsilon_2);
 
             if (Math.abs(epsilon - eps1) < tol && Math.abs(epsilon - eps2) < tol) {
                 break;
             }
 
             if (Math.abs(epsilon - eps1) > tol) {
-                if (eps1 > epsilon) {
+                if (eps1 < epsilon) {
                     eta_1_sup = eta_1;
                 } else {
                     eta_1_inf = eta_1;
@@ -475,15 +494,14 @@ public class OblateFOV {
     }
 
 
-
     private static double[] getEpsilons(double e_P1, double u_P1, double e_P2, double u_P2, double m_P1, double m_P2, double a_tilde, double b_tilde) {
 
         // Determination of the tangents in P1 and P2
         double m_t_P1, m_t_P2;
 
         // Tangent slope
-        var v0 = pow(a_tilde, 2) * sqrt(1 - pow((e_P1 / a_tilde), 2));
-        var v1 = pow(a_tilde, 2) * sqrt(1 - pow((e_P2 / a_tilde), 2));
+        var v0 = pow(a_tilde, 2.0) * sqrt(1 - pow((e_P1 / a_tilde), 2.0));
+        var v1 = pow(a_tilde, 2.0) * sqrt(1 - pow((e_P2 / a_tilde), 2.0));
 
         if (u_P1 >= 0) {     // Selection of the semi-ellipse
             m_t_P1 = (-b_tilde * e_P1) / v0;
@@ -498,12 +516,12 @@ public class OblateFOV {
         }
 
         // Elevation angle computation: angle between two lines
-        var epsilon_1 = Math.atan((-m_t_P1 + m_P1) / (1 + m_t_P1 * m_P1));
-        var epsilon_2 = Math.atan((m_t_P2 - m_P2) / (1 + m_t_P2 * m_P2));
+        double epsilon_1 = Math.atan((-m_t_P1 + m_P1) / (1 + m_t_P1 * m_P1));
+        double epsilon_2 = Math.atan((m_t_P2 - m_P2) / (1 + m_t_P2 * m_P2));
 
         // Conversion into degrees
-        epsilon_1 = Math.toDegrees(epsilon_1);
-        epsilon_2 = Math.toDegrees(epsilon_2);
+//        epsilon_1 = Math.toDegrees(epsilon_1);
+//        epsilon_2 = Math.toDegrees(epsilon_2);
 
         //// Determination of the tangents in P1 and P2
 //        double m_t_P1 = getTangentSlope(e_P1, u_P1, a_tilde, b_tilde);
@@ -514,8 +532,8 @@ public class OblateFOV {
 //        var epsilon_2 = Math.atan((m_t_P2 - m_P2) / (1 + m_t_P2 * m_P2));
 
         // Conversion into degrees
-//        epsilon_1 = Math.toDegrees(epsilon_1);
-//        epsilon_2 = Math.toDegrees(epsilon_2);
+        epsilon_1 = Math.toDegrees(epsilon_1);
+        epsilon_2 = Math.toDegrees(epsilon_2);
 
         return new double[]{epsilon_1, epsilon_2};
 
@@ -545,15 +563,15 @@ public class OblateFOV {
         double m_P2 = Math.tan(alpha_P2);
 
         //Coefficients to normalise the equation and reduce the error
-        double coeff2_1 = (2 * m_P1 * pow(a_tilde, 2) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
-        double coeff3_1 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
+        double coeff2_1 = (2.0 * m_P1 * pow(a_tilde, 2.0) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2.0) * pow(m_P1, 2.0) + pow(b_tilde, 2.0));
+        double coeff3_1 = (-pow(a_tilde, 2.0) * pow(b_tilde, 2.0) + pow(a_tilde, 2.0) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2.0) * pow(m_P1, 2.0) + pow(b_tilde, 2.0));
 
-        double coeff2_2 = (2 * m_P2 * pow(a_tilde, 2) * (u_sc - m_P2 * e_sc)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
-        double coeff3_2 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P2 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P2, 2) + pow(b_tilde, 2));
+        double coeff2_2 = (2.0 * m_P2 * pow(a_tilde, 2.0) * (u_sc - m_P2 * e_sc)) / (pow(a_tilde, 2.0) * pow(m_P2, 2.0) + pow(b_tilde, 2.0));
+        double coeff3_2 = (-pow(a_tilde, 2.0) * pow(b_tilde, 2.0) + pow(a_tilde, 2.0) * pow((u_sc - m_P2 * e_sc), 2)) / (pow(a_tilde, 2.0) * pow(m_P2, 2.0) + pow(b_tilde, 2.0));
 
         //Discriminant of the second-degree equation
-        double Delta_P1 = pow(coeff2_1, 2) - 4 * coeff3_1;
-        double Delta_P2 = pow(coeff2_2, 2) - 4 * coeff3_2;
+        double Delta_P1 = pow(coeff2_1, 2.0) - 4.0 * coeff3_1;
+        double Delta_P2 = pow(coeff2_2, 2.0) - 4.0 * coeff3_2;
 
         double e_P1 = 0, e_P2 = 0;
         // First case
@@ -569,7 +587,7 @@ public class OblateFOV {
 
         } else if (alpha_SC > Math.PI / 2 && alpha_SC <= Math.PI) {   // Second Quadrant
             //Selection of the two right solutions among the possible four
-            if (alpha_P2 <= Math.PI / 2) {
+            if (alpha_P1 <= Math.PI / 2) {
                 e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
             } else {
                 e_P1 = (-coeff2_1 - sqrt(Delta_P1)) / 2;
@@ -587,9 +605,9 @@ public class OblateFOV {
                 e_P2 = (-coeff2_2 + sqrt(Delta_P2)) / 2;
             }
 
-        } else if (alpha_SC > -Math.PI / 2 && alpha_SC < 0) {   // Fourth Quadrant
+        } else if (alpha_SC > -Math.PI / 2.0 && alpha_SC < 0.0) {   // Fourth Quadrant
             //Selection of the two right solutions among the possible four
-            if (alpha_P2 <= Math.PI / 2) {
+            if (alpha_P1 <= Math.PI / 2.0) {
                 e_P1 = (-coeff2_1 - sqrt(Delta_P1)) / 2;
             } else {
                 e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
