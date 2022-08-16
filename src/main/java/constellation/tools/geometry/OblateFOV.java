@@ -1,9 +1,7 @@
 package constellation.tools.geometry;
 
-import org.apache.commons.math3.geometry.Vector;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import satellite.tools.utils.Log;
-import satellite.tools.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -231,7 +229,7 @@ public class OblateFOV {
             } else if (type == 1) {     // Using th
 //                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
 //                vectors = computeWithElevationBisect(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
-                vectors = computeWithElevationOriginal(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
+                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
 
             }
 
@@ -321,71 +319,9 @@ public class OblateFOV {
 
     }
 
-    /**TESTED WITH -990.945443, -5817.571039, 3334.217811**/
     public static List<double[]> computeWithElevationGD(double a_tilde, double b_tilde, double alpha_SC,
                                                         double eta_hor_1, double eta_hor_2, double epsilon,
                                                         double tol, Vector3D r_line_local) {
-
-        List<double[]> coordinates = new ArrayList<>();
-        Vector3D P1 = new Vector3D(0, 0, 0);
-        Vector3D P2 = new Vector3D(0, 0, 0);
-
-        // Definition of the S/C coordinates in the local frame
-        double e_sc = r_line_local.getX();
-        double u_sc = r_line_local.getY();
-
-        // Aperture angles initialisation
-        double eta_1 = eta_hor_1 - 0.0001 * PI / 180;
-        double eta_2 = eta_hor_2 - 0.0001 * PI / 180;
-
-        // Errors and tolerance initialisation
-        double err_1 = 1;
-        double err_2 = 1;
-
-        while (err_1 > tol || err_2 > tol) {
-
-            // Angle of the secants w.r.to the semi-major axis direction
-            double alpha_P1 = (alpha_SC - eta_1);
-            double alpha_P2 = (alpha_SC + eta_2);
-
-            //Slopes of the two secants
-            double m_P1 = Math.tan(alpha_P1);
-            double m_P2 = Math.tan(alpha_P2);
-
-            double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
-
-            double e_P1 = eComponents[0];
-            double e_P2 = eComponents[1];
-            double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
-            double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
-
-            double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
-
-            // Error update
-            err_1 = epsilon - epsilons[0];
-            err_2 = epsilon - epsilons[1];
-
-            // Decrease the initial guess for the half-aperture angle
-            if (epsilons[0] < epsilon) {
-                eta_1 = eta_1 - 0.0001;
-            }
-
-            if (epsilons[1] < epsilon) {
-                eta_2 = eta_2 - 0.0001;
-            }
-
-        }
-
-        coordinates.add(new double[]{P1.getX(), P1.getY(), P1.getZ()});
-        coordinates.add(new double[]{P2.getX(), P2.getY(), P2.getZ()});
-
-        return coordinates;
-
-    }
-
-    public static List<double[]> computeWithElevationOriginal(double a_tilde, double b_tilde, double alpha_SC,
-                                                      double eta_hor_1, double eta_hor_2, double epsilon,
-                                                      double tol, Vector3D r_line_local) {
 
         List<double[]> coordinates = new ArrayList<>();
 
