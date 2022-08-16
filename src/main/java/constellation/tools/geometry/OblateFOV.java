@@ -258,7 +258,7 @@ public class OblateFOV {
 
     }
 
-
+    /**TESTED WITH -990.945443, -5817.571039, 3334.217811**/
     private static List<double[]> computeHalfAperture(double a_tilde, double b_tilde, double alpha_SC, double etaDeg,
                                                       double eta_hor_1, double eta_hor_2, Vector3D r_line_local) {
 
@@ -318,70 +318,6 @@ public class OblateFOV {
 
     }
 
-//    public static List<double[]> computeWithElevationGD(double a_tilde, double b_tilde, double alpha_SC,
-//                                                        double eta_hor_1, double eta_hor_2, double epsilon,
-//                                                        double tol, Vector3D r_line_local) {
-//
-//        List<double[]> coordinates = new ArrayList<>(2);
-//
-//        // Definition of the S/C coordinates in the local frame
-//        double e_sc = r_line_local.getX();
-//        double u_sc = r_line_local.getY();
-//
-//        // Aperture angles initialization
-//        double eta_1 = eta_hor_1 - 0.0001 * PI / 180;
-//        double eta_2 = eta_hor_2 - 0.0001 * PI / 180;
-//
-//
-//        // Errors, tolerance and vectors initialisation
-//        double err_1 = 1;
-//        double err_2 = 1;
-//        double e_P1 = 0, e_P2 = 0, u_P1 = 0, u_P2 = 0;
-//
-//        int it = 0;
-//
-//        while ((err_1 > tol || err_2 > tol) && it < 1000) {
-//
-//            // Angle of the secants w.r.to the semi-major axis direction
-//            double alpha_P1 = (alpha_SC - eta_1);
-//            double alpha_P2 = (alpha_SC + eta_2);
-//
-//            //Slopes of the two secants
-//            double m_P1 = Math.tan(alpha_P1);
-//            double m_P2 = Math.tan(alpha_P2);
-//
-//            double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
-//
-//            e_P1 = eComponents[0];
-//            e_P2 = eComponents[1];
-//            u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
-//            u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
-//
-//            double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
-//
-//            // Error update
-//            err_1 = epsilon - epsilons[0];
-//            err_2 = epsilon - epsilons[1];
-//
-//            // Decrease the initial guess for the half-aperture angle
-//            if (epsilons[0] < epsilon) {
-//                eta_1 = eta_1 - 0.001;
-//            }
-//
-//            if (epsilons[1] < epsilon) {
-//                eta_2 = eta_2 - 0.001;
-//            }
-//
-//            it++;
-//
-//        }
-//
-//        coordinates.add(new double[]{e_P1, u_P1, 0});
-//        coordinates.add(new double[]{e_P2, u_P2, 0});
-//
-//        return coordinates;
-//
-//    }
 //
 //    public static List<double[]> computeWithElevation(double a_tilde, double b_tilde, double alpha_SC,
 //                                                      double eta_hor_1, double eta_hor_2, double epsilon,
@@ -613,8 +549,139 @@ public class OblateFOV {
 //    }
 //
 
-    // TODO THIS WORKS!
+
+//    public static List<double[]> computeWithElevationGD(double a_tilde, double b_tilde, double alpha_SC,
+//                                                        double eta_hor_1, double eta_hor_2, double epsilon,
+//                                                        double tol, Vector3D r_line_local) {
+//
+//        List<double[]> coordinates = new ArrayList<>(2);
+//
+//        // Definition of the S/C coordinates in the local frame
+//        double e_sc = r_line_local.getX();
+//        double u_sc = r_line_local.getY();
+//
+//        // Aperture angles initialization
+//        double eta_1 = eta_hor_1 - 0.0001 * PI / 180;
+//        double eta_2 = eta_hor_2 - 0.0001 * PI / 180;
+//
+//
+//        // Errors, tolerance and vectors initialisation
+//        double err_1 = 1;
+//        double err_2 = 1;
+//        double e_P1 = 0, e_P2 = 0, u_P1 = 0, u_P2 = 0;
+//
+//        int it = 0;
+//
+//        while ((err_1 > tol || err_2 > tol) && it < 1000) {
+//
+//            // Angle of the secants w.r.to the semi-major axis direction
+//            double alpha_P1 = (alpha_SC - eta_1);
+//            double alpha_P2 = (alpha_SC + eta_2);
+//
+//            //Slopes of the two secants
+//            double m_P1 = Math.tan(alpha_P1);
+//            double m_P2 = Math.tan(alpha_P2);
+//
+//            double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
+//
+//            e_P1 = eComponents[0];
+//            e_P2 = eComponents[1];
+//            u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
+//            u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
+//
+//            double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
+//
+//            // Error update
+//            err_1 = epsilon - epsilons[0];
+//            err_2 = epsilon - epsilons[1];
+//
+//            // Decrease the initial guess for the half-aperture angle
+//            if (epsilons[0] < epsilon) {
+//                eta_1 = eta_1 - 0.001;
+//            }
+//
+//            if (epsilons[1] < epsilon) {
+//                eta_2 = eta_2 - 0.001;
+//            }
+//
+//            it++;
+//
+//        }
+//
+//        coordinates.add(new double[]{e_P1, u_P1, 0});
+//        coordinates.add(new double[]{e_P2, u_P2, 0});
+//
+//        return coordinates;
+//
+//    }
+
+
+    /**TESTED WITH -990.945443, -5817.571039, 3334.217811**/
     public static List<double[]> computeWithElevationGD(double a_tilde, double b_tilde, double alpha_SC,
+                                                        double eta_hor_1, double eta_hor_2, double epsilon,
+                                                        double tol, Vector3D r_line_local) {
+
+        List<double[]> coordinates = new ArrayList<>();
+        Vector3D P1 = new Vector3D(0, 0, 0);
+        Vector3D P2 = new Vector3D(0, 0, 0);
+
+        // Definition of the S/C coordinates in the local frame
+        double e_sc = r_line_local.getX();
+        double u_sc = r_line_local.getY();
+
+        // Aperture angles initialisation
+        double eta_1 = eta_hor_1 - 0.0001 * PI / 180;
+        double eta_2 = eta_hor_2 - 0.0001 * PI / 180;
+
+        // Errors and tolerance initialisation
+        double err_1 = 1;
+        double err_2 = 1;
+
+        while (err_1 > tol || err_2 > tol) {
+
+            // Angle of the secants w.r.to the semi-major axis direction
+            double alpha_P1 = (alpha_SC - eta_1);
+            double alpha_P2 = (alpha_SC + eta_2);
+
+            //Slopes of the two secants
+            double m_P1 = Math.tan(alpha_P1);
+            double m_P2 = Math.tan(alpha_P2);
+
+            double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
+
+            double e_P1 = eComponents[0];
+            double e_P2 = eComponents[1];
+            double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
+            double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
+
+            double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
+
+            // Error update
+            err_1 = epsilon - epsilons[0];
+            err_2 = epsilon - epsilons[1];
+
+            // Decrease the initial guess for the half-aperture angle
+            if (epsilons[0] < epsilon) {
+                eta_1 = eta_1 - 0.0001;
+            }
+
+            if (epsilons[1] < epsilon) {
+                eta_2 = eta_2 - 0.0001;
+            }
+
+        }
+
+        coordinates.add(new double[]{P1.getX(), P1.getY(), P1.getZ()});
+        coordinates.add(new double[]{P2.getX(), P2.getY(), P2.getZ()});
+
+        return coordinates;
+
+    }
+
+
+
+    // TODO THIS WORKS!
+    public static List<double[]> computeWithElevationGD2(double a_tilde, double b_tilde, double alpha_SC,
                                                       double eta_hor_1, double eta_hor_2, double epsilon,
                                                       double tol, Vector3D r_line_local) {
 
@@ -644,6 +711,8 @@ public class OblateFOV {
             double m_P1 = Math.tan(alpha_P1);
             double m_P2 = Math.tan(alpha_P2);
 
+            double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
+
             //Coefficients to normalise the equation and reduce the error
             double coeff2_1 = (2 * m_P1 * pow(a_tilde, 2) * (u_sc - m_P1 * e_sc)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
             double coeff3_1 = (-pow(a_tilde, 2) * pow(b_tilde, 2) + pow(a_tilde, 2) * pow((u_sc - m_P1 * e_sc), 2)) / (pow(a_tilde, 2) * pow(m_P1, 2) + pow(b_tilde, 2));
@@ -655,7 +724,8 @@ public class OblateFOV {
             double Delta_P1 = pow(coeff2_1, 2) - 4 * coeff3_1;
             double Delta_P2 = pow(coeff2_2, 2) - 4 * coeff3_2;
 
-            double e_P1 = 0, e_P2 = 0;
+            double e_P1 = eComponents[0];
+            double e_P2 = eComponents[1];
             // First case
             if (alpha_SC >= 0 && alpha_SC <= Math.PI / 2) { // First Quadrant
                 e_P1 = (-coeff2_1 + sqrt(Delta_P1)) / 2;
