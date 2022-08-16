@@ -388,8 +388,6 @@ public class OblateFOV {
                                                       double tol, Vector3D r_line_local) {
 
         List<double[]> coordinates = new ArrayList<>();
-        Vector3D P1 = new Vector3D(0, 0, 0);
-        Vector3D P2 = new Vector3D(0, 0, 0);
 
         // Definition of the S/C coordinates in the local frame
         double e_sc = r_line_local.getX();
@@ -403,6 +401,8 @@ public class OblateFOV {
         double err_1 = 1;
         double err_2 = 1;
 
+        double e_P1 = 0, e_P2 = 0, u_P1 = 0, u_P2 = 0;
+
         while (err_1 > tol || err_2 > tol) {
 
             // Angle of the secants w.r.to the semi-major axis direction
@@ -415,14 +415,10 @@ public class OblateFOV {
 
             double[] eComponents = getEComponents(alpha_SC, alpha_P1, alpha_P2, a_tilde, b_tilde, e_sc, u_sc);
 
-            double e_P1 = eComponents[0];
-            double e_P2 = eComponents[1];
-            double u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
-            double u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
-
-            // Points in vector form
-            P1 = new Vector3D(e_P1, u_P1, 0);
-            P2 = new Vector3D(e_P2, u_P2, 0);
+            e_P1 = eComponents[0];
+            e_P2 = eComponents[1];
+            u_P1 = m_P1 * e_P1 - m_P1 * e_sc + u_sc;
+            u_P2 = m_P2 * e_P2 - m_P2 * e_sc + u_sc;
 
             double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
 
@@ -445,8 +441,8 @@ public class OblateFOV {
 
         }
 
-        coordinates.add(new double[]{P1.getX(), P1.getY(), P1.getZ()});
-        coordinates.add(new double[]{P2.getX(), P2.getY(), P2.getZ()});
+        coordinates.add(new double[]{e_P1, u_P1, 0});
+        coordinates.add(new double[]{e_P2, u_P2, 0});
 
         return coordinates;
 
@@ -464,7 +460,7 @@ public class OblateFOV {
 
         // Aperture angles initialization
         double etaSpherical = getSphericalEta(r_line_local, epsilon);
-//        double eta_1_sup = eta_hor_1 - 0.0001 * PI / 180;
+        // Double eta_1_sup = eta_hor_1 - 0.0001 * PI / 180;
         double eta_1_sup = eta_hor_1 - 0.0001 * PI / 180;
         double eta_2_sup = eta_hor_2 - 0.0001 * PI / 180;
 
@@ -499,8 +495,13 @@ public class OblateFOV {
 
             double[] epsilons = getEpsilons(e_P1, u_P1, e_P2, u_P2, m_P1, m_P2, a_tilde, b_tilde);
 
-            eps1 = epsilons[0];
-            eps2 = epsilons[1];
+            // Error update
+            double epsilon_1 = epsilons[0];
+            double epsilon_2 = epsilons[1];
+
+            // Conversion into degrees
+            eps1 = Math.toDegrees(epsilon_1);
+            eps2 = Math.toDegrees(epsilon_2);
 
             if (Math.abs(epsilon - eps1) < tol && Math.abs(epsilon - eps2) < tol) {
                 break;
@@ -541,7 +542,7 @@ public class OblateFOV {
 
     private static double[] getEpsilons(double e_P1, double u_P1, double e_P2, double u_P2, double m_P1, double m_P2, double a_tilde, double b_tilde) {
 
-        //// Determination of the tangents in P1 and P2
+        // Determination of the tangents in P1 and P2
         double m_t_P1, m_t_P2;
 
         // Tangent slope
