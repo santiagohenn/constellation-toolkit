@@ -357,8 +357,10 @@ public class OblateFOV {
 
         double e_P1 = 0, e_P2 = 0, u_P1 = 0, u_P2 = 0;
         double alpha_P1 = 0, alpha_P2 = 0;
+        int wdt = -1;
 
-        while (err_1 > tol || err_2 > tol) {
+        while ((err_1 > tol || err_2 > tol) && wdt < 1000) {
+            wdt++;
 
             // Angle of the secants w.r.to the semi-major axis direction
             alpha_P1 = (alpha_SC - eta_1);
@@ -394,6 +396,10 @@ public class OblateFOV {
                 eta_2 = eta_2 - 0.0001;
             }
 
+        }
+
+        if (wdt >= 1000) {
+            Log.warn("Woof!");
         }
 
         coordinates.add(new double[]{e_P1, u_P1, 0});

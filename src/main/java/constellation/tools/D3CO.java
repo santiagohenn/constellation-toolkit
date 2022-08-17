@@ -526,16 +526,17 @@ public class D3CO implements Runnable {
 
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
+            System.out.println(date.toString());
             Ephemeris eph = simulation.getECEFVectorAt(date);
 
             // TODO: If new procedure works replace with computePVDAt
 
             double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
             // List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
+            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX() / 1000.0, eph.getPosY() / 1000.0, eph.getPosZ() / 1000.0,
+                    VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
 //            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX()/1000.0, eph.getPosY()/1000.0, eph.getPosZ()/1000.0,
-//                    VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
-            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX()/1000.0, eph.getPosY()/1000.0, eph.getPosZ()/1000.0,
-                    69, POLYGON_SEGMENTS);
+//                    69, POLYGON_SEGMENTS);
 
             FOV FOV = new FOV(satellite.getId(), eph.getLatitude(), eph.getLongitude(), poly);
             FOV.setPolygonCoordinates(poly);
