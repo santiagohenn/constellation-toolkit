@@ -526,24 +526,27 @@ public class D3CO implements Runnable {
 
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
-            System.out.println(date.toString());
             Ephemeris eph = simulation.getECEFVectorAt(date);
 
             // TODO: If new procedure works replace with computePVDAt
 
+            double x = eph.getPosX() / 1000.0;
+            double y = eph.getPosY() / 1000.0;
+            double z = eph.getPosZ() / 1000.0;
+
             double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
             // List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
-            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX() / 1000.0, eph.getPosY() / 1000.0, eph.getPosZ() / 1000.0,
-                    VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
+            List<double[]> poly = OblateFOV.drawLLAConic(x, y, z, VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
 //            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX()/1000.0, eph.getPosY()/1000.0, eph.getPosZ()/1000.0,
 //                    69, POLYGON_SEGMENTS);
 
-            FOV FOV = new FOV(satellite.getId(), eph.getLatitude(), eph.getLongitude(), poly);
+            double[] ssp = OblateFOV.ecef2llaD(x, y, z);
+            FOV FOV = new FOV(satellite.getId(), ssp[0], ssp[1], poly);
             FOV.setPolygonCoordinates(poly);
 
-            double surface = geo.computeNonEuclideanSurface2(poly);
+//            double surface = geo.computeNonEuclideanSurface2(poly);
+//            FOV.setSurface(surface);
 
-            FOV.setSurface(surface);
             FOVList.add(FOV);
         }
 

@@ -674,12 +674,12 @@ public class OblateFOV {
         return Math.asin((a_avg * Math.cos(Math.toRadians(epsilon))) / (a_avg + height));
     }
 
-    private static double[] ecef2llaD(double x, double y, double z) {
+    public static double[] ecef2llaD(double x, double y, double z) {
         double[] lla = ecef2lla(x, y, z);
         return new double[]{Math.toDegrees(lla[0]), Math.toDegrees(lla[1]), lla[2]};
     }
 
-    private static double[] ecef2lla(double x, double y, double z) {
+    public static double[] ecef2lla(double x, double y, double z) {
 
         double ep = Math.sqrt((Math.pow(a, 2.0D) - b2) / b2);
         double p = Math.sqrt(Math.pow(x, 2.0D) + Math.pow(y, 2.0D));

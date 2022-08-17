@@ -2,6 +2,7 @@ package constellation.tools.geometry;
 
 import constellation.tools.math.Pair;
 import net.sf.geographiclib.*;
+import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
@@ -106,7 +107,6 @@ public class Geo {
         }
         return 0;
     }
-
 
     /**
      * Computes the angular distance over the euclidean plane given two pair of Region objects. Said objects
