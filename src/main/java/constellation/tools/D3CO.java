@@ -127,7 +127,7 @@ public class D3CO implements Runnable {
 
                 for (List<Integer> combination : combinationsList) {
 
-                    List<double[]> nonEuclideanCoordinates = new ArrayList<>();
+                    List<double[]> nonEuclideanCoordinates = new ArrayList<>(); // TODO Move this up
                     List<double[]> euclideanCoordinates = new ArrayList<>();
 
                     // assemble a list of the FOVs to be intersected at this time step:
@@ -137,8 +137,8 @@ public class D3CO implements Runnable {
                     // Get reference point for the projection //FIXME use satellite lambda
                     int poleProximity; // = checkPoleInclusion(FOVsToIntersect);
                     poleProximity = 1;
-                    double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
-                    double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
+                    double referenceLat = 90; // poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
+                    double referenceLon = 0; // 0; // FOVsToIntersect.get(0).getReferenceLon();
 
                     // If this is the immediate FOV for a single satellite
                     if (combination.size() <= 1) {
@@ -177,7 +177,7 @@ public class D3CO implements Runnable {
                                 referenceLat, referenceLon));
                     }
 
-                    if (SAVE_EUCLIDEAN && DEBUG_MODE) {
+                    if (SAVE_EUCLIDEAN) {
                         euclideanAAPs.add(new AAP(timeElapsed, combination.size(), combination, euclideanCoordinates,
                                 euclideanCoordinates.stream().map(pair -> pair[0]).collect(Collectors.toList()),
                                 euclideanCoordinates.stream().map(pair -> pair[1]).collect(Collectors.toList()),
@@ -196,9 +196,9 @@ public class D3CO implements Runnable {
 
         if (SAVE_GEOGRAPHIC || SAVE_EUCLIDEAN || SAVE_SNAPSHOT) {
             try (ProgressBar pb = new ProgressBar("Saving AAPs", 100)) {
-                if (SAVE_GEOGRAPHIC && !SAVE_SNAPSHOT) saveAAPs(nonEuclideanAAPs, "ne_polygons");
+                if (SAVE_GEOGRAPHIC) saveAAPs(nonEuclideanAAPs, "ne_polygons");
                 pb.stepTo(25);
-                if (SAVE_EUCLIDEAN && !SAVE_SNAPSHOT) saveAAPs(euclideanAAPs, "e_polygons");
+                if (SAVE_EUCLIDEAN) saveAAPs(euclideanAAPs, "e_polygons");
                 pb.stepTo(50);
                 if (SAVE_SNAPSHOT) saveAAPsAt(nonEuclideanAAPs, "snapshot_ne_polygons", SNAPSHOT);
                 pb.stepTo(75);
@@ -533,19 +533,17 @@ public class D3CO implements Runnable {
             double x = eph.getPosX() / 1000.0;
             double y = eph.getPosY() / 1000.0;
             double z = eph.getPosZ() / 1000.0;
-
-            double lambdaMax = geo.getLambdaMax(satellite.getElement("a"), VISIBILITY_THRESHOLD);
-            // List<double[]> poly = geo.drawCircularAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
-            List<double[]> poly = OblateFOV.drawLLAConic(x, y, z, VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
-//            List<double[]> poly = OblateFOV.drawLLAConic(eph.getPosX()/1000.0, eph.getPosY()/1000.0, eph.getPosZ()/1000.0,
-//                    69, POLYGON_SEGMENTS);
-
             double[] ssp = OblateFOV.ecef2llaD(x, y, z);
-            FOV FOV = new FOV(satellite.getId(), ssp[0], ssp[1], poly);
-            FOV.setPolygonCoordinates(poly);
 
-//            double surface = geo.computeNonEuclideanSurface2(poly);
-//            FOV.setSurface(surface);
+            List<double[]> poly = OblateFOV.drawLLAConic(x, y, z, VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
+            double lambdaMax = geo.getLambdaMax(x, y, z, VISIBILITY_THRESHOLD);
+            // List<double[]> poly = geo.drawCircularAAP(lambdaMax, ssp[0], ssp[1], POLYGON_SEGMENTS);
+
+            FOV FOV = new FOV(satellite.getId(), ssp[0], ssp[1], poly);
+            FOV.setLambdaMax(lambdaMax);
+//            FOV FOV = new FOV(satellite.getId(), Math.toDegrees(eph.getLatitude()), Math.toDegrees(eph.getLongitude()), poly);
+
+            FOV.setPolygonCoordinates(poly);
 
             FOVList.add(FOV);
         }

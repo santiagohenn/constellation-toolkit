@@ -8,6 +8,8 @@ import java.util.List;
 
 import static java.lang.Math.*;
 
+// https://de.mathworks.com/matlabcentral/fileexchange/81848-coverage-area-determination-considering-an-oblate-earth
+// https://github.com/SpaceMarco93/Oblate-Earth-Coverage
 public class OblateFOV {
 
     public static final double WGS84_F = 1 / 298.257223563;

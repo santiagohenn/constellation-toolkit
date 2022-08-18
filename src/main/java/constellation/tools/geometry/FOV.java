@@ -9,6 +9,7 @@ public class FOV {
     private final int satId;
     private List<double[]> polygonCoordinates;
     private double surface;
+    private double lambdaMax;
 
     public FOV(int satId, double centerLat, double centerLong, List<double[]> polygon) {
         this.satId = satId;
@@ -25,6 +26,14 @@ public class FOV {
         this.polygonCoordinates = polygonCoordinates;
     }
 
+    public double getLambdaMax() {
+        return lambdaMax;
+    }
+
+    public void setLambdaMax(double lambdaMax) {
+        this.lambdaMax = lambdaMax;
+    }
+
     public int getSatId() {
         return satId;
     }
@@ -35,6 +44,10 @@ public class FOV {
 
     public double getSspLon() {
         return sspLon;
+    }
+
+    public double getSurface() {
+        return surface;
     }
 
     public double getSurfaceKm2() {
