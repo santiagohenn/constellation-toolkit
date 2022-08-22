@@ -138,33 +138,13 @@ public class Geo {
 
     /**
      * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
-     * vertices. This method uses the net.sf.geographiclib library.
-     *
-     * @param pairList A List containing the coordinates of the polygon
-     * @return Double the computed area in meters squared
-     **/
-    public double computeNonEuclideanSurface(List<Pair> pairList) { // TODO: REMOVE IF 2 WORKS
-
-        PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
-
-        for (Pair pair : pairList) {
-            polygonArea.AddPoint(pair.lat, pair.lon);
-        }
-
-        PolygonResult result = polygonArea.Compute();
-        return Math.abs(result.area);
-
-    }
-
-    /**
-     * This method computes the geodetic area of a list of coordinates, given by Pair objects depicting the polygon's
      * vertices. This method uses the net.sf.geographiclib library. Paper: https://doi.org/10.1007/s00190-012-0578-z
      * Section 6 , C. F. F. Karney, Algorithms for geodesics, J. Geodesy 87, 43–55 (2013).
      *
      * @param pairList A List containing the coordinates of the polygon
      * @return Double the computed area in meters squared
      **/
-    public double computeNonEuclideanSurface2(List<double[]> pairList) {
+    public double computeNonEuclideanSurface(List<double[]> pairList) {
 
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
@@ -212,8 +192,9 @@ public class Geo {
      * This method returns the maximum Lambda, which is defined as the maximum Earth Central Angle or
      * half of a satellite's "cone FOV" over the surface of the Earth.
      *
-     * @param semiMajorAxis       the orbit's semi major axis in meters
-     * @param eccentricity        the orbit's eccentricity
+     * @param x x component of the position vector in ECEF coordinates
+     * @param y y component of the position vector in ECEF coordinates
+     * @param z z component of the position vector in ECEF coordinates
      * @param visibilityThreshold the height above horizon visibility threshold in degrees
      * @return Te maximum Earth Central Angle for the access area, in degrees
      **/
@@ -236,7 +217,7 @@ public class Geo {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public List<double[]> drawCircularAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public List<double[]> drawSphericalAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 
@@ -388,7 +369,7 @@ public class Geo {
 
     public double[] computeAntipode(double lat, double lon) {
 
-        double[] antipode = new double[2];
+        double[] antipode = new double[]{lat, lon};
         antipode[0] = -1 * antipode[0];
         antipode[1] = 180 - antipode[1];
 
@@ -420,30 +401,13 @@ public class Geo {
             double lat = Math.toRadians(nePair[0]);
             double lon = Math.toRadians(nePair[1]);
             convertGeodeticToPolarStereographic(lat, lon);
-//            double[] stereo = toStereo(nePair[0], nePair[1], referenceLat, referenceLon);
+//            double[] stereo = toStereo(nePair[0], nePair[1], referenceLatRads, referenceLonRads);
             euclideanPolygon.add(new double[]{this.Easting, this.Northing});
 //            euclideanPolygon.add(new double[]{stereo[0], stereo[1]});
 
         }
 
         return euclideanPolygon;
-
-    }
-
-    /**
-     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
-     **/
-    public static double[] toStereo(double lat, double lon, double referenceLatRads, double referenceLonRads) {
-
-        double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-
-        double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
-                Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-        double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
-        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-        return new double[]{xStereo, yStereo};
 
     }
 
@@ -465,39 +429,64 @@ public class Geo {
 
             convertPolarStereographicToGeodetic(xStereo, yStereo);
 
-//
-//
-//            double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
-//
-//            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
-//
-//            double c = 2 * Math.atan2(rho, 2.0 * localRadius);
-//            double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
-//            double lon;
-//
-//            // For exactly the poles, avoid indeterminate points in the equations
-//            if (referenceLat == 90.0) {
-//                lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
-//            } else if (referenceLat == -90.0) {
-//                lon = referenceLonRads + Math.atan2(xStereo, yStereo);
-//            } else {
-//                lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
-//                        - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
-//            }
-//
-//            // Go back to degrees
-//            lat = Math.toDegrees(lat);
-//            lon = Math.toDegrees(lon);
-//
-//            while (lon < -180D) lon += 360;
-//            while (lon > 180D) lon -= 360;
-
             GCSPolygon.add(new double[]{Math.toDegrees(this.Latitude), Math.toDegrees(this.Longitude)});
 //            GCSPolygon.add(new double[]{lat, lon});
 
         }
 
         return GCSPolygon;
+
+    }
+
+    /**
+     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
+     **/
+    public static double[] toStereo(double lat, double lon, double referenceLatRads, double referenceLonRads) {
+
+        double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+
+        double k = (2 * localRadius) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
+                Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+        double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
+        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
+
+
+        return new double[]{xStereo, yStereo};
+
+    }
+
+    /**
+     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
+     **/
+    public static double[] toGeodetic(double xStereo, double yStereo, double referenceLatRads, double referenceLonRads) {
+
+            double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
+
+            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+
+            double c = 2 * Math.atan2(rho, 2.0 * localRadius);
+            double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
+            double lon;
+
+            // For exactly the poles, avoid indeterminate points in the equations
+            if (referenceLatRads == Math.PI) {
+                lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
+            } else if (referenceLonRads == -Math.PI) {
+                lon = referenceLonRads + Math.atan2(xStereo, yStereo);
+            } else {
+                lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
+                        - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
+            }
+
+            // Go back to degrees
+            lat = Math.toDegrees(lat);
+            lon = Math.toDegrees(lon);
+
+            while (lon < -180D) lon += 360;
+            while (lon > 180D) lon -= 360;
+
+        return new double[]{xStereo, yStereo};
 
     }
 

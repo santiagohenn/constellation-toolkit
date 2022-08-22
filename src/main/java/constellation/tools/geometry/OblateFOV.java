@@ -222,7 +222,7 @@ public class OblateFOV {
             if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
                 alpha_SC = PI / 2;
             } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
-                alpha_SC = - PI / 2;
+                alpha_SC = -PI / 2;
             } else if (Math.abs(alpha_SC - PI) < 10E-15) {
                 alpha_SC = PI;
             } else if (Math.abs(alpha_SC + PI) < 10E-15) {
@@ -699,5 +699,22 @@ public class OblateFOV {
         }
         return new double[]{lat, lon, alt};
     }
+
+    public static double[] lla2ecef(double[] lla){
+
+        double lat = lla[0];
+        double lon = lla[1];
+        double alt = lla[2];
+
+        double N = a / Math.sqrt(1 - E2 * Math.pow(Math.sin(lat),2) );
+
+        double x = (N+alt) * Math.cos(lat) * Math.cos(lon);
+        double y = (N+alt) * Math.cos(lat) * Math.sin(lon);
+        double z = ((1-E2) * N + alt) * Math.sin(lat);
+
+        double[] ret = {x, y, z};
+        return ret;
+    }
+
 
 }

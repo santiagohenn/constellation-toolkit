@@ -4,17 +4,33 @@ import java.util.List;
 
 public class FOV {
 
-    private final double sspLat;
-    private final double sspLon;
-    private final int satId;
+    private double sspLat;
+    private double sspLon;
+    private double height;
+    private int satId;
     private List<double[]> polygonCoordinates;
     private double surface;
     private double lambdaMax;
+    private double x;
+    private double y;
+    private double z;
+
+    public FOV() {
+
+    }
 
     public FOV(int satId, double centerLat, double centerLong, List<double[]> polygon) {
         this.satId = satId;
         this.sspLat = centerLat;
         this.sspLon = centerLong;
+        this.polygonCoordinates = polygon;
+    }
+
+    public FOV(int satId, double centerLat, double centerLong, double height, List<double[]> polygon) {
+        this.satId = satId;
+        this.sspLat = centerLat;
+        this.sspLon = centerLong;
+        this.height = height;
         this.polygonCoordinates = polygon;
     }
 
@@ -34,6 +50,30 @@ public class FOV {
         this.lambdaMax = lambdaMax;
     }
 
+    public void setSatPos(double x, double y, double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    public void setSatLLA(double lat, double lon, double height) {
+        this.sspLat = lat;
+        this.sspLon = lon;
+        this.height = height;
+    }
+
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
+    public double getZ() {
+        return z;
+    }
+
     public int getSatId() {
         return satId;
     }
@@ -44,6 +84,10 @@ public class FOV {
 
     public double getSspLon() {
         return sspLon;
+    }
+
+    public double getHeight() {
+        return height;
     }
 
     public double getSurface() {

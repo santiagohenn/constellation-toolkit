@@ -8,8 +8,8 @@ import java.util.List;
 
 public class ReportGenerator {
 
-    private static final String JSON_EXTENSION = ".json";
-    private static final String CSV_EXTENSION = ".csv";
+    public static final String JSON_EXTENSION = ".json";
+    public static final String CSV_EXTENSION = ".csv";
     private final String outputPath;
 
     public ReportGenerator(String outputPath) {
