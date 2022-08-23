@@ -307,6 +307,7 @@ public class Geo {
 //            double conformalLat = Transformations.lat2conformal(pointerLat);
 //            conformalLat = pointerLat;
             coordinates.add(new double[]{gcLat2gdLatD(pointerLat), pointerLon});
+//            coordinates.add(new double[]{pointerLat, pointerLon});
 
         }
         return coordinates;

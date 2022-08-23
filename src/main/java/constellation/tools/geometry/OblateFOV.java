@@ -219,19 +219,13 @@ public class OblateFOV {
             // Angle between the S/C line-of-sight and the the semi-major axis direction e
             double alpha_SC = Math.atan2(u_sc, e_sc);
 
-            if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
-                alpha_SC = PI / 2;
-            } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
-                alpha_SC = -PI / 2;
-            } else if (Math.abs(alpha_SC - PI) < 10E-15) {
-                alpha_SC = PI;
-            } else if (Math.abs(alpha_SC + PI) < 10E-15) {
-                alpha_SC = -PI;
-            }
-
-//            if ((alpha_SC - PI) < 10E-16) {
+//            if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
+//                alpha_SC = PI / 2;
+//            } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
+//                alpha_SC = -PI / 2;
+//            } else if (Math.abs(alpha_SC - PI) < 10E-15) {
 //                alpha_SC = PI;
-//            } else if ((alpha_SC + PI) < 10E-16) {
+//            } else if (Math.abs(alpha_SC + PI) < 10E-15) {
 //                alpha_SC = -PI;
 //            }
 
@@ -245,9 +239,8 @@ public class OblateFOV {
             if (type == 0) {    // Using eta
                 vectors = computeHalfAperture(a_tilde, b_tilde, alpha_SC, eta, eta_hor_1, eta_hor_2, r_line_local);
             } else if (type == 1) {     // Using th
-                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
-//                vectors = computeWithElevationBisect(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
 //                vectors = computeWithElevationGD(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
+                vectors = computeWithElevationBisect(a_tilde, b_tilde, alpha_SC, eta_hor_1, eta_hor_2, epsilon, tol, r_line_local);
 
             }
 

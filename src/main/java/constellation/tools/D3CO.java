@@ -54,6 +54,7 @@ public class D3CO implements Runnable {
     private final double VISIBILITY_THRESHOLD = Double.parseDouble((String) prop.get("visibility_threshold"));
     private final int POLYGON_SEGMENTS = Integer.parseInt((String) prop.get("polygon_segments"));
     private final double POLYGON_EPSILON = Double.parseDouble((String) prop.get("polygon_epsilon"));
+    private final double LAMBDA_EXCLUSION = Double.parseDouble((String) prop.get("lambda_exclusion"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
 
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
@@ -101,8 +102,6 @@ public class D3CO implements Runnable {
         }
 
         Simulation simulation = new Simulation(orekitPath);
-//        simulation.setInertialFrame(FramesFactory.getTEME());
-//        simulation.setEarthFrame(FramesFactory.getTEME());
 
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE, DataContext.getDefault().getTimeScales().getUTC());
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -136,26 +135,22 @@ public class D3CO implements Runnable {
                 accMetric(0, toc(0));
 
                 if (timeElapsed == SNAPSHOT && DEBUG_MODE) {
-                    System.out.println();
+                    System.out.println("Orekit snapshot positions: ");
                     nonEuclideanFOVs.forEach(fov -> {
                         System.out.println(fov.getX() + "," + fov.getY() + ","
                                 + fov.getZ() + "," + fov.getSspLat() + "," + fov.getSspLon());
                     });
+                    System.out.println("Outside snapshot positions: ");
+                    constellation.forEach(map ->
+                    {
+                        Ephemeris eph = map.get(timeElapsed);
+                        System.out.println(eph.getPosX() + "," + eph.getPosY() + "," + eph.getPosZ());
+                    });
                 }
-
-                // Get reference point for the projection //FIXME use satellite lambda
-//                int poleProximity = checkPoleDistance(nonEuclideanFOVs);
-////                    poleProximity = 1;
-//                double referenceLat = poleProximity * 90; // FOVsToIntersect.get(0).getReferenceLat();
-//                double referenceLon = 0; // FOVsToIntersect.get(0).getReferenceLon();
-//
-//                if (timeElapsed == SNAPSHOT) {
-//                    Log.warn("Pole proximity: " + poleProximity + " -> " + referenceLat + " , " + referenceLon);
-//                }
 
                 for (List<Integer> combination : combinationsList) {
 
-                    List<double[]> nonEuclideanCoordinates = new ArrayList<>(); // TODO Move this up?
+                    List<double[]> nonEuclideanCoordinates = new ArrayList<>();
                     List<double[]> euclideanCoordinates = new ArrayList<>();
 
                     // assemble a list of the FOVs to be intersected at this time step:
@@ -165,8 +160,6 @@ public class D3CO implements Runnable {
                     // Get reference point for the projection //FIXME use satellite lambda
                     double referenceLat = 0;
                     double referenceLon = 0;
-
-//                    double[] reference = getProjectionReference(FOVsToIntersect);
 
                     // If this is the immediate FOV for a single satellite
                     if (combination.size() <= 1) {
@@ -221,7 +214,6 @@ public class D3CO implements Runnable {
         Log.info("Prop Time: " + metrics[0]);
         Log.info("Initial K=1 AAPs: " + metrics[1]);
         Log.info("Intersect: " + metrics[2]);
-        Log.info("Intersect (bis): " + metrics[4]);
         Log.info("Performed: " + performed + " - Avoided: " + avoided + " - Escaped: " + escaped);
         Log.info("Time to compute AAPs: " + toc(1));
 
@@ -326,6 +318,7 @@ public class D3CO implements Runnable {
 
                         try {
                             Polygon union = polyUnion(unionQueue);
+                            union = polyUnion(union.getRegions());  // Second union if some polygons got clipped out
                             union.getRegions().forEach(region -> {
                                 List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
                                 surfaceValues[k - 1] = surfaceValues[k - 1] + geo.computeNonEuclideanSurface(neIntersection);
@@ -423,31 +416,43 @@ public class D3CO implements Runnable {
     private Polygon polyIntersect(List<List<double[]>> intersectionQueue) {
 
         Polygon intersection = new Polygon();
+        double epsilon = POLYGON_EPSILON;
 
-        // Union of all ROI intersections
-        try {
-            Epsilon eps = epsilon(POLYGON_EPSILON);
-            Polygon result = polygon(intersectionQueue.get(0));
-            PolyBool.Segments segments = PolyBool.segments(eps, result);
-            for (int i = 1; i < intersectionQueue.size(); i++) {
-                PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(intersectionQueue.get(i)));
-                tic(4);
-                PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
-                accMetric(4, toc(4));
-                segments = PolyBool.selectIntersect(comb);
+        int tries = 0;
+
+        while (tries < 3) {
+
+            // Union of all ROI intersections
+            try {
+
+                Epsilon eps = epsilon(epsilon);
+                Polygon result = polygon(intersectionQueue.get(0));
+                PolyBool.Segments segments = PolyBool.segments(eps, result);
+                for (int i = 1; i < intersectionQueue.size(); i++) {
+                    PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(intersectionQueue.get(i)));
+                    PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                    segments = PolyBool.selectIntersect(comb);
+                }
+
+                intersection = PolyBool.polygon(eps, segments);
+
+                if (tries > 0) {
+                    Log.warn("Zero-length segment error recovered with epsilon " + epsilon);
+                }
+
+                break;
+
+            } catch (IndexOutOfBoundsException e1) {
+                Log.error("IndexOutOfBoundsException " + e1.getMessage());
+            } catch (RuntimeException e2) {
+                Log.warn(e2.getMessage());
+                Log.warn("RuntimeException. - Increasing epsilon");
+                epsilon *= 10;
+                tries++;
+                if (tries == 3) {
+                    Log.error("Zero-length segment error could not be recovered.");
+                }
             }
-
-            intersection = PolyBool.polygon(eps, segments);
-
-        } catch (IndexOutOfBoundsException e1) {
-            Log.error("IndexOutOfBoundsException " + e1.getMessage());
-            Log.error("polygons to be or list size: " + intersectionQueue.size());
-            intersectionQueue.forEach(region -> {
-                Log.error("Region " + intersectionQueue.indexOf(region) + " size: " + intersectionQueue.size());
-            });
-        } catch (RuntimeException e2) {
-            Log.error(e2.getMessage());
-            Log.error("RuntimeException " + intersectionQueue.size());
         }
 
         return intersection;
@@ -519,9 +524,16 @@ public class D3CO implements Runnable {
         for (int nOfGw = 1; nOfGw <= MAX_SUBSET_SIZE; nOfGw++) {
             int finalNOfGw = nOfGw;
 
-            reportGenerator.saveAsJSON(AAPs.stream()
-                    .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
-                    .collect(Collectors.toList()), fileName + "_" + nOfGw);
+            try {
+                reportGenerator.saveAsJSON(AAPs.stream()
+                        .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
+                        .collect(Collectors.toList()), fileName + "_" + nOfGw);
+            } catch (IllegalArgumentException e) {
+                AAPs.stream()
+                        .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
+                        .collect(Collectors.toList()).forEach(aap ->
+                        System.out.println(aap.getReferenceLat() + "," + aap.getReferenceLon() + "," + aap.getSurfaceInKm2()));
+            }
         }
 
     }
@@ -566,16 +578,13 @@ public class D3CO implements Runnable {
             if (PROPAGATE_INTERNALLY) {
                 simulation.setSatellite(satellite);
                 eph = simulation.computeEphemerisKm(date);
-//                Ephemeris  ephDebug = constellation.get(satellite.getId()).get(timeElapsed);
-//                System.out.println("Ork: " + eph.getPosX() + "," + eph.getPosY() + "," + eph.getPosZ());
-//                System.out.println("stk: " + ephDebug.getPosX() + "," + ephDebug.getPosY() + "," + ephDebug.getPosZ());
             } else {
                 eph = constellation.get(satellite.getId()).get(timeElapsed);
             }
 
 //            Ephemeris ecef = Utils.teme2ecef(eph, Transformations.unix2julian(unixDate));
 
-            double x = 0,y = 0,z = 0;
+            double x = 0, y = 0, z = 0;
 
             try {
                 x = eph.getPosX();
@@ -589,26 +598,13 @@ public class D3CO implements Runnable {
 
             if (PROPAGATE_INTERNALLY) {
                 eph.setSSP(Math.toDegrees(eph.getLatitude()), Math.toDegrees(eph.getLongitude()), eph.getHeight());
-            } else {
-                double[] ssp = OblateFOV.ecef2llaD(x, y, z);
-                eph.setSSP(ssp[0], ssp[1], ssp[2]);
             }
-
-//            double x = ecef.getPosX() / 1000.0;
-//            double y = ecef.getPosY() / 1000.0;
-//            double z = ecef.getPosZ() / 1000.0;
-
-//            System.out.println("ECEF: " + ecef.getPosX() + "," + ecef.getPosY() + "," + ecef.getPosZ());
-
-//            double[] ssp = OblateFOV.ecef2llaD(x, y, z);
-
-//            System.out.println("TEME: " + teme.getPosX() + "," + teme.getPosY() + "," + teme.getPosZ() + "," + ssp[0] + "," + ssp[1]);
 
             double lambdaMax = geo.getLambdaMax(x, y, z, VISIBILITY_THRESHOLD);
 
             List<double[]> poly = OblateFOV.drawLLAConic(x, y, z, VISIBILITY_THRESHOLD, 1E-4, POLYGON_SEGMENTS);
 //            List<double[]> poly = OblateFOV.drawLLAConic(x, y, z, 69, POLYGON_SEGMENTS);
-//             List<double[]> poly = geo.drawSphericalAAP(lambdaMax, ssp[0], ssp[1], POLYGON_SEGMENTS);
+//             List<double[]> poly = geo.drawSphericalAAP(lambdaMax, eph.getLatitude(), eph.getLongitude(), POLYGON_SEGMENTS);
 
             FOV fov = new FOV();
             fov.setLambdaMax(lambdaMax);
@@ -642,15 +638,11 @@ public class D3CO implements Runnable {
             int r1Idx = pairToCheck.get(0);
             int r2Idx = pairToCheck.get(1);
 
-            // FIX
-//            double lambda1 = geo.getLambdaMax(satelliteList.get(FOVList.get(r1Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
-//            double lambda2 = geo.getLambdaMax(satelliteList.get(FOVList.get(r2Idx).getSatId()).getElement("a"), VISIBILITY_THRESHOLD);
             double lambda1 = FOVList.get(r1Idx).getLambdaMax();
             double lambda2 = FOVList.get(r2Idx).getLambdaMax();
             double distance = geo.computeGeodesic(FOVList.get(r1Idx), FOVList.get(r2Idx));
 
-            // FIXME ADDED MARGIN
-            if (distance >= (lambda1 + lambda2)*1.01) {
+            if (distance >= (lambda1 + lambda2) * (1 + LAMBDA_EXCLUSION / 100.0)) {
                 return false;
             }
         }
@@ -853,10 +845,13 @@ public class D3CO implements Runnable {
                     if (!line.startsWith("//") && line.length() > 0) {
                         var data = line.split(",");
                         long time = Long.parseLong(data[0]);
-                        Ephemeris eph = new Ephemeris(time, Double.parseDouble(data[1]),
-                                Double.parseDouble(data[2]),
-                                Double.parseDouble(data[3]));
-                        positions.put(time,eph);
+                        double x = Double.parseDouble(data[1]);
+                        double y = Double.parseDouble(data[2]);
+                        double z = Double.parseDouble(data[3]);
+                        Ephemeris eph = new Ephemeris(time, x, y, z);
+                        double[] ssp = OblateFOV.ecef2llaD(x, y, z);
+                        eph.setSSP(ssp[0], ssp[1], ssp[2]);
+                        positions.put(time, eph);
                     }
                 }
             } catch (FileNotFoundException e) {
