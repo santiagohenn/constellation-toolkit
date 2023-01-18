@@ -57,7 +57,7 @@ public class D3CO implements Runnable {
     private final double LAMBDA_EXCLUSION = Double.parseDouble((String) prop.get("lambda_exclusion"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
 
-    private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
+    private List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<String> statistics = new ArrayList<>();
     private List<Map<Long, Ephemeris>> constellation;
 
@@ -76,8 +76,7 @@ public class D3CO implements Runnable {
      * Default constructor
      **/
     public D3CO() {
-
-
+        satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     }
 
     public D3CO(String threadName) {
@@ -135,16 +134,16 @@ public class D3CO implements Runnable {
                 accMetric(0, toc(0));
 
                 if (timeElapsed == SNAPSHOT && DEBUG_MODE) {
-                    System.out.println("Orekit snapshot positions: ");
+                    Log.debug("Orekit snapshot positions: ");
                     nonEuclideanFOVs.forEach(fov -> {
-                        System.out.println(fov.getX() + "," + fov.getY() + ","
+                        Log.debug(fov.getX() + "," + fov.getY() + ","
                                 + fov.getZ() + "," + fov.getSspLat() + "," + fov.getSspLon());
                     });
-                    System.out.println("Outside snapshot positions: ");
+                    Log.debug("Outside snapshot positions: ");
                     constellation.forEach(map ->
                     {
                         Ephemeris eph = map.get(timeElapsed);
-                        System.out.println(eph.getPosX() + "," + eph.getPosY() + "," + eph.getPosZ());
+                        Log.debug(eph.getPosX() + "," + eph.getPosY() + "," + eph.getPosZ());
                     });
                 }
 
