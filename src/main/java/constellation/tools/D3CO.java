@@ -608,11 +608,12 @@ public class D3CO implements Runnable {
                 eph = simulation.computeFixedEphemeris(date);
 //                eph = simulation.getECEFVectorAt(date);
                 eph.setPos(eph.getPosX() / 1000.0, eph.getPosY() / 1000.0, eph.getPosZ() / 1000.0);
+                eph.setSSP(Math.toDegrees(eph.getLatitude()), Math.toDegrees(eph.getLongitude()), eph.getHeight());
             } else {
                 eph = constellation.get(satellite.getId()).get(timeElapsed);
             }
 
-//            Ephemeris ecef = Utils.teme2ecef(eph, Transformations.unix2julian(unixDate));
+//          eph = Utils.teme2ecef(eph, Transformations.unix2julian(Utils.stamp2unix(date.toString())));
 
             double x = 0, y = 0, z = 0;
 
@@ -622,15 +623,11 @@ public class D3CO implements Runnable {
                 z = eph.getPosZ();
 //                Ephemeris ecef = Utils.teme2ecef(eph, Transformations.unix2julian(Utils.stamp2unix(date.toString())));
 //                Log.info(ecef.getPosX() + "," + ecef.getPosY() + "," + ecef.getPosZ());
-                System.out.println(x + "," + y + "," + z);
+//                System.out.println(x + "," + y + "," + z);
             } catch (NullPointerException e) {
                 Log.error("time: " + timeElapsed);
                 Log.error("sat id: " + satellite.getId());
                 e.printStackTrace();
-            }
-
-            if (PROPAGATE_INTERNALLY) {
-                eph.setSSP(Math.toDegrees(eph.getLatitude()), Math.toDegrees(eph.getLongitude()), eph.getHeight());
             }
 
             double lambdaMax = geo.getLambdaMax(x, y, z, VISIBILITY_THRESHOLD);
