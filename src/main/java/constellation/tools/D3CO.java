@@ -12,7 +12,9 @@ import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
 import org.orekit.data.DataContext;
+import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.IERSConventions;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.structures.Ephemeris;
@@ -57,7 +59,7 @@ public class D3CO implements Runnable {
     private final double LAMBDA_EXCLUSION = Double.parseDouble((String) prop.get("lambda_exclusion"));
     private final int MAX_SUBSET_SIZE = Integer.parseInt((String) prop.get("max_subset_size"));
 
-    private List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
+    private List<Satellite> satelliteList;
     private final List<String> statistics = new ArrayList<>();
     private List<Map<Long, Ephemeris>> constellation;
 
@@ -100,10 +102,14 @@ public class D3CO implements Runnable {
             constellation = positionsFromPath(POSITIONS_PATH);
         }
 
+//        Simulation simulation = new Simulation(START_DATE, END_DATE, new Position(), satelliteList.get(0), 60.0, 25);
         Simulation simulation = new Simulation(orekitPath);
+        simulation.setInertialFrame(FramesFactory.getEME2000());
+        simulation.setEarthFrame(FramesFactory.getITRF(IERSConventions.IERS_2010, true));
+        Log.info(simulation.getStartTime() + "-" + simulation.getEndTime());
 
-        AbsoluteDate endDate = Utils.stamp2AD(END_DATE, DataContext.getDefault().getTimeScales().getUTC());
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
+        AbsoluteDate endDate = Utils.stamp2AD(END_DATE, DataContext.getDefault().getTimeScales().getUTC());
         double scenarioDuration = endDate.durationFrom(startDate);
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
@@ -128,7 +134,7 @@ public class D3CO implements Runnable {
                 long timeElapsed = stamp2unix(t.toString()) - stamp2unix(START_DATE);
                 pb.stepTo((long) (Math.round(timeElapsed * 100 * 100.00 / scenarioDuration) / 100.00));
 
-                // Obtain the starting non-euclidean FOVs and their surface value
+                // Obtain the starting non-euclidean FOVs
                 tic(0);
                 List<FOV> nonEuclideanFOVs = computeFOVsAt(satelliteList, simulation, t, timeElapsed);
                 accMetric(0, toc(0));
@@ -293,9 +299,22 @@ public class D3CO implements Runnable {
                     // For each AAP with this number of assets in sight
                     aaps.forEach(aap -> {
 
-                        // Intersections with ROI
-                        List<double[]> eIntersection = intersectAndGetPolygon(euclideanROI.get(),
-                                Transformations.toEuclideanPlane(aap.getGeoCoordinates(), referenceLat, referenceLon));
+                        List<double[]> eIntersection = new ArrayList<>();
+
+                        try {
+                            List<List<double[]>> polygonAndROI = Arrays.asList(euclideanROI.get(),
+                                    Transformations.toEuclideanPlane(aap.getGeoCoordinates(),
+                                        referenceLat, referenceLon));
+                            Polygon intersection = polyIntersect(polygonAndROI);
+                            eIntersection = intersection.getRegions().isEmpty() ? eIntersection : intersection.getRegions().get(0);
+
+                        } catch (RuntimeException e) {
+                            Log.error("Error trying to intercept the following polygon: ");
+                            aap.getGeoCoordinates().forEach(c -> System.out.println(c[0] + "," + c[1]));
+                            System.out.println("### WITH ###");
+                            nonEuclideanROI.forEach(c -> System.out.println(c[0] + "," + c[1]));
+                            e.printStackTrace();
+                        }
 
                         if (eIntersection.size() >= 3) {
                             // Collections.reverse(eIntersection);
@@ -412,7 +431,11 @@ public class D3CO implements Runnable {
     /**
      * Performs the Intersection of a list of polygons
      **/
-    private Polygon polyIntersect(List<List<double[]>> intersectionQueue) {
+    private Polygon polyIntersect(List<List<double[]>> polygonsToIntersect) {
+
+        if (polygonsToIntersect.stream().allMatch(List::isEmpty)) {
+            return new Polygon(new ArrayList<>());
+        }
 
         Polygon intersection = new Polygon();
         double epsilon = POLYGON_EPSILON;
@@ -425,10 +448,10 @@ public class D3CO implements Runnable {
             try {
 
                 Epsilon eps = epsilon(epsilon);
-                Polygon result = polygon(intersectionQueue.get(0));
+                Polygon result = polygon(polygonsToIntersect.get(0));
                 PolyBool.Segments segments = PolyBool.segments(eps, result);
-                for (int i = 1; i < intersectionQueue.size(); i++) {
-                    PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(intersectionQueue.get(i)));
+                for (int i = 1; i < polygonsToIntersect.size(); i++) {
+                    PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(polygonsToIntersect.get(i)));
                     PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
                     segments = PolyBool.selectIntersect(comb);
                 }
@@ -455,6 +478,46 @@ public class D3CO implements Runnable {
         }
 
         return intersection;
+
+    }
+
+    /**
+     * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    private List<double[]> intersectAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
+
+        if (polygonA.size() == 0 || polygonB.size() == 0) {
+            return new ArrayList<>();
+        }
+
+        List<List<double[]>> regions1 = new ArrayList<>();
+        regions1.add(polygonA);
+
+        List<List<double[]>> regions2 = new ArrayList<>();
+        regions2.add(polygonB);
+
+        Polygon polyA = new Polygon(regions1);
+        Polygon polyB = new Polygon(regions2);
+        Polygon intersection = new Polygon();
+
+        Epsilon eps = epsilon(POLYGON_EPSILON);
+
+        try {
+            intersection = PolyBool.intersect(eps, polyA, polyB);
+        } catch (RuntimeException e) {
+            Log.error("Error intersecting polygons. Retrying with epsilon " + POLYGON_EPSILON * 10);
+            eps = epsilon(POLYGON_EPSILON * 10);
+            intersection = PolyBool.intersect(eps, polyA, polyB);
+        }
+
+        if (intersection.getRegions().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return intersection.getRegions().get(0);
 
     }
 
@@ -560,7 +623,7 @@ public class D3CO implements Runnable {
 
     /**
      * This method takes the satellite list, propagates orbits to the specified date and computes the corresponding
-     * access area or FOV polygon as a Region object for each one.
+     * access area or FOV polygon for each one.
      *
      * @param satelliteList a list of Satellite objects
      * @param date          an AbsoluteDate object
@@ -576,7 +639,10 @@ public class D3CO implements Runnable {
 
             if (PROPAGATE_INTERNALLY) {
                 simulation.setSatellite(satellite);
-                eph = simulation.computeEphemerisKm(date);
+//                eph = simulation.computeEphemerisKm(date);
+                eph = simulation.computeFixedEphemeris(date);
+//                eph = simulation.getECEFVectorAt(date);
+                eph.setPos(eph.getPosX() / 1000.0, eph.getPosY() / 1000.0, eph.getPosZ() / 1000.0);
             } else {
                 eph = constellation.get(satellite.getId()).get(timeElapsed);
             }
@@ -589,6 +655,9 @@ public class D3CO implements Runnable {
                 x = eph.getPosX();
                 y = eph.getPosY();
                 z = eph.getPosZ();
+//                Ephemeris ecef = Utils.teme2ecef(eph, Transformations.unix2julian(Utils.stamp2unix(date.toString())));
+//                Log.info(ecef.getPosX() + "," + ecef.getPosY() + "," + ecef.getPosZ());
+                System.out.println(x + "," + y + "," + z);
             } catch (NullPointerException e) {
                 Log.error("time: " + timeElapsed);
                 Log.error("sat id: " + satellite.getId());
@@ -761,47 +830,6 @@ public class D3CO implements Runnable {
 
     }
 
-    // TODO: this can be improved inheriting the library's intersection capabilities, for now, we dont trust them
-
-    /**
-     * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private List<double[]> intersectAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
-
-        if (polygonA.size() == 0 || polygonB.size() == 0) {
-            return new ArrayList<>();
-        }
-
-        List<List<double[]>> regions1 = new ArrayList<>();
-        regions1.add(polygonA);
-
-        List<List<double[]>> regions2 = new ArrayList<>();
-        regions2.add(polygonB);
-
-        Polygon polyA = new Polygon(regions1);
-        Polygon polyB = new Polygon(regions2);
-        Polygon intersection = new Polygon();
-
-        Epsilon eps = epsilon(POLYGON_EPSILON);
-
-        try {
-            intersection = PolyBool.intersect(eps, polyA, polyB);
-        } catch (RuntimeException e) {
-            eps = epsilon(POLYGON_EPSILON * 10);
-            intersection = PolyBool.intersect(eps, polyA, polyB);
-        }
-
-        if (intersection.getRegions().isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return intersection.getRegions().get(0);
-
-    }
-
     // TODO: FIX URGENT IN SATELLITE TOOLS
     public static long stamp2unix(String timestamp) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
@@ -836,7 +864,7 @@ public class D3CO implements Runnable {
 
         for (int nSat = 0; nSat < satelliteList.size(); nSat++) {
             Map<Long, Ephemeris> positions = new LinkedHashMap<>();
-            var file = new File(path + "S" + nSat + ReportGenerator.CSV_EXTENSION);
+            var file = new File(path + "S" + nSat + "" + ReportGenerator.CSV_EXTENSION);
             try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
                 String line;
                 int id = 0;
@@ -844,9 +872,9 @@ public class D3CO implements Runnable {
                     if (!line.startsWith("//") && line.length() > 0) {
                         var data = line.split(",");
                         long time = Long.parseLong(data[0]);
-                        double x = Double.parseDouble(data[1]);
-                        double y = Double.parseDouble(data[2]);
-                        double z = Double.parseDouble(data[3]);
+                        double x = round(Double.parseDouble(data[1]));
+                        double y = round(Double.parseDouble(data[2]));
+                        double z = round(Double.parseDouble(data[3]));
                         Ephemeris eph = new Ephemeris(time, x, y, z);
                         double[] ssp = OblateFOV.ecef2llaD(x, y, z);
                         eph.setSSP(ssp[0], ssp[1], ssp[2]);
@@ -863,6 +891,10 @@ public class D3CO implements Runnable {
             constellation.add(positions);
         }
         return constellation;
+    }
+
+    private double round(double num) {
+        return Math.round(num * 1000000D) / 1000000D;
     }
 
 }
