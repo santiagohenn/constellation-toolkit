@@ -317,7 +317,6 @@ public class D3CO implements Runnable {
                         }
 
                         if (eIntersection.size() >= 3) {
-                            // Collections.reverse(eIntersection);
                             unionQueue.add(eIntersection);
                         } else if (eIntersection.size() != 0) {
                             Log.warn("Intersection with less than 3 points");
@@ -381,6 +380,9 @@ public class D3CO implements Runnable {
 
     /**
      * Performs the union of a list of polygons
+     *
+     *  @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     *  @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
      **/
     private Polygon polyUnion(List<List<double[]>> unionQueue) {
 
@@ -430,6 +432,9 @@ public class D3CO implements Runnable {
 
     /**
      * Performs the Intersection of a list of polygons
+     *
+     *  @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     *  @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
      **/
     private Polygon polyIntersect(List<List<double[]>> polygonsToIntersect) {
 
@@ -478,46 +483,6 @@ public class D3CO implements Runnable {
         }
 
         return intersection;
-
-    }
-
-    /**
-     * This method takes two polygons, and returns their intersection using the Martinez-Rueda Algorithm.
-     *
-     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
-     **/
-    private List<double[]> intersectAndGetPolygon(List<double[]> polygonA, List<double[]> polygonB) {
-
-        if (polygonA.size() == 0 || polygonB.size() == 0) {
-            return new ArrayList<>();
-        }
-
-        List<List<double[]>> regions1 = new ArrayList<>();
-        regions1.add(polygonA);
-
-        List<List<double[]>> regions2 = new ArrayList<>();
-        regions2.add(polygonB);
-
-        Polygon polyA = new Polygon(regions1);
-        Polygon polyB = new Polygon(regions2);
-        Polygon intersection = new Polygon();
-
-        Epsilon eps = epsilon(POLYGON_EPSILON);
-
-        try {
-            intersection = PolyBool.intersect(eps, polyA, polyB);
-        } catch (RuntimeException e) {
-            Log.error("Error intersecting polygons. Retrying with epsilon " + POLYGON_EPSILON * 10);
-            eps = epsilon(POLYGON_EPSILON * 10);
-            intersection = PolyBool.intersect(eps, polyA, polyB);
-        }
-
-        if (intersection.getRegions().isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return intersection.getRegions().get(0);
 
     }
 
