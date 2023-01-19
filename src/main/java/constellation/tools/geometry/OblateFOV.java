@@ -177,12 +177,15 @@ public class OblateFOV {
             double u_sc = r_line_local.getY();
 
             // Coefficients derived from the normalisation of the second-degree
-            // equation to reduce te numerical error
+            // equation to reduce the numerical error
             double coeff_1 = (2 * e_sc * u_sc) / (Math.pow(a_tilde, 2) - Math.pow(e_sc, 2));
             double coeff_2 = (Math.pow(b_tilde, 2) - Math.pow(u_sc, 2)) / (Math.pow(a_tilde, 2) - Math.pow(e_sc, 2));
 
             // Discrimant of the second degree-equation
             double Delta_hor = Math.pow(coeff_1, 2) - 4 * coeff_2;
+
+            // Fix in case rounding errors result in a negative discriminant
+            Delta_hor = Math.max(0, Delta_hor);
 
             // Slopes of the tangents: condition to assign the proper P1 and P2
             double m_T1, m_T2;

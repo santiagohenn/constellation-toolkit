@@ -77,7 +77,7 @@ public class SSPProp {
 
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
-            Ephemeris ephemeris = simulation.computeEphemerisKm(date);
+            Ephemeris ephemeris = simulation.computeFixedEphemerisKm(date);
             FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), null);
             FOVList.add(FOV);
         }

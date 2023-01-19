@@ -72,7 +72,7 @@ public class D3CO implements Runnable {
     Thread d3coThread;
     String threadName;
 
-    // TODO: Add banlist
+    // TODO: Add ban list
 
     /**
      * Default constructor
@@ -102,10 +102,10 @@ public class D3CO implements Runnable {
             constellation = positionsFromPath(POSITIONS_PATH);
         }
 
-//        Simulation simulation = new Simulation(START_DATE, END_DATE, new Position(), satelliteList.get(0), 60.0, 25);
         Simulation simulation = new Simulation(orekitPath);
+        simulation.setParams(START_DATE, END_DATE, TIME_STEP, VISIBILITY_THRESHOLD);
         simulation.setInertialFrame(FramesFactory.getEME2000());
-        simulation.setEarthFrame(FramesFactory.getITRF(IERSConventions.IERS_2010, true));
+        simulation.setFixedFrame(FramesFactory.getITRF(IERSConventions.IERS_2010, true));
         Log.info(simulation.getStartTime() + "-" + simulation.getEndTime());
 
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
@@ -115,6 +115,8 @@ public class D3CO implements Runnable {
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
         Combination comb = new Combination(satelliteList.size(), MAX_SUBSET_SIZE);
         final List<List<Integer>> combinationsList = comb.computeCombinations();
+
+        Log.debug("Combinations: " + combinationsList.toString());
 
         List<AAP> nonEuclideanAAPs = new ArrayList<>();
         List<AAP> euclideanAAPs = new ArrayList<>();
@@ -310,9 +312,9 @@ public class D3CO implements Runnable {
 
                         } catch (RuntimeException e) {
                             Log.error("Error trying to intercept the following polygon: ");
-                            aap.getGeoCoordinates().forEach(c -> System.out.println(c[0] + "," + c[1]));
-                            System.out.println("### WITH ###");
-                            nonEuclideanROI.forEach(c -> System.out.println(c[0] + "," + c[1]));
+                            aap.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
+                            Log.error("### WITH ###");
+                            nonEuclideanROI.forEach(c -> Log.error(c[0] + "," + c[1]));
                             e.printStackTrace();
                         }
 
@@ -559,7 +561,7 @@ public class D3CO implements Runnable {
                 AAPs.stream()
                         .filter(AAP -> AAP.getnOfGwsInSight() == finalNOfGw)
                         .collect(Collectors.toList()).forEach(aap ->
-                        System.out.println(aap.getReferenceLat() + "," + aap.getReferenceLon() + "," + aap.getSurfaceInKm2()));
+                        Log.error(aap.getReferenceLat() + "," + aap.getReferenceLon() + "," + aap.getSurfaceInKm2()));
             }
         }
 
@@ -604,16 +606,12 @@ public class D3CO implements Runnable {
 
             if (PROPAGATE_INTERNALLY) {
                 simulation.setSatellite(satellite);
-//                eph = simulation.computeEphemerisKm(date);
-                eph = simulation.computeFixedEphemeris(date);
-//                eph = simulation.getECEFVectorAt(date);
-                eph.setPos(eph.getPosX() / 1000.0, eph.getPosY() / 1000.0, eph.getPosZ() / 1000.0);
+                eph = simulation.computeFixedEphemerisKm(date);
+                eph.setPos(eph.getPosX(), eph.getPosY(), eph.getPosZ());
                 eph.setSSP(Math.toDegrees(eph.getLatitude()), Math.toDegrees(eph.getLongitude()), eph.getHeight());
             } else {
                 eph = constellation.get(satellite.getId()).get(timeElapsed);
             }
-
-//          eph = Utils.teme2ecef(eph, Transformations.unix2julian(Utils.stamp2unix(date.toString())));
 
             double x = 0, y = 0, z = 0;
 
@@ -621,9 +619,6 @@ public class D3CO implements Runnable {
                 x = eph.getPosX();
                 y = eph.getPosY();
                 z = eph.getPosZ();
-//                Ephemeris ecef = Utils.teme2ecef(eph, Transformations.unix2julian(Utils.stamp2unix(date.toString())));
-//                Log.info(ecef.getPosX() + "," + ecef.getPosY() + "," + ecef.getPosZ());
-//                System.out.println(x + "," + y + "," + z);
             } catch (NullPointerException e) {
                 Log.error("time: " + timeElapsed);
                 Log.error("sat id: " + satellite.getId());
@@ -642,6 +637,11 @@ public class D3CO implements Runnable {
             fov.setSatPos(x, y, z);
             fov.setPolygonCoordinates(poly);
             FOVList.add(fov);
+
+            if (timeElapsed == 0) {
+                Log.debug(x + "," + y + "," + z);
+            }
+
         }
 
         return FOVList;
