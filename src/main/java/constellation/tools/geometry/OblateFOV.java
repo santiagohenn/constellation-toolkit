@@ -24,8 +24,6 @@ public class OblateFOV {
     public static final double b4 = Math.pow(b, 4);
     public static final double E2 = Math.pow(WGS84_E, 2);
 
-    private static boolean flag = false;
-
     public static List<double[]> drawLLAConic(double x, double y, double z, double eta, int segments) {
         List<double[]> coordinates = drawConic(x, y, z, eta, 0, 0, segments, 0);
         return toLLA(coordinates);
@@ -36,7 +34,7 @@ public class OblateFOV {
         return toLLA(coordinates);
     }
 
-    private static List<double[]> toLLA(List<double[]> coordinates) {
+    public static List<double[]> toLLA(List<double[]> coordinates) {
         coordinates.forEach(c -> {
             double[] lla = ecef2llaD(c[0], c[1], c[2]);
             c[0] = lla[0];
@@ -54,6 +52,21 @@ public class OblateFOV {
         return drawConic(x, y, z, 0, epsilon, tol, segments, 1);
     }
 
+    /**
+     * This method returns a list of coordinates depicting the access area of a satellite located at the Earth Centered
+     * Earth Fixed coordinates (x,y,z). The two possible methods are: (0) the cone of access is computed using a conic
+     * on the satellite with eta = half-angle of visibility or (1) the cone of access is computed using the elevation
+     * threshold epsilon.
+     *
+     * @param x the x component of the satellite's position (Km)
+     * @param y the y component of the satellite's position (Km)
+     * @param z the z component of the satellite's position (Km)
+     * @param eta the satellite's cone half-angle of visibility (degrees)
+     * @param epsilon elevation threshold (degrees)
+     * @param tol tolerance when obtaining the half-angle from a given elevation threshold (degrees)
+     * @param segments the amount of segments for a half-cone of visibility
+     * @return a List of double[] containing the polygons coordinates in degrees
+     **/
     public static List<double[]> drawConic(double x, double y, double z, double eta, double epsilon, double tol,
                                            int segments, int type) {
 
@@ -161,9 +174,6 @@ public class OblateFOV {
 
             // Definition of the S/C coordinates in the local frame
             double e_sc = r_line_local.getX();
-//            if (abs(e_sc) < 1E-10) {
-//                e_sc = 0;
-//            }
             double u_sc = r_line_local.getY();
 
             // Coefficients derived from the normalisation of the second-degree
@@ -219,15 +229,15 @@ public class OblateFOV {
             // Angle between the S/C line-of-sight and the the semi-major axis direction e
             double alpha_SC = Math.atan2(u_sc, e_sc);
 
-//            if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
-//                alpha_SC = PI / 2;
-//            } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
-//                alpha_SC = -PI / 2;
-//            } else if (Math.abs(alpha_SC - PI) < 10E-15) {
-//                alpha_SC = PI;
-//            } else if (Math.abs(alpha_SC + PI) < 10E-15) {
-//                alpha_SC = -PI;
-//            }
+            if (Math.abs(alpha_SC - PI / 2) < 10E-15) {
+                alpha_SC = PI / 2;
+            } else if (Math.abs(alpha_SC + PI / 2) < 10E-15) {
+                alpha_SC = -PI / 2;
+            } else if (Math.abs(alpha_SC - PI) < 10E-15) {
+                alpha_SC = PI;
+            } else if (Math.abs(alpha_SC + PI) < 10E-15) {
+                alpha_SC = -PI;
+            }
 
             // Total horizon boresight angle
             double eta_hor = eta_hor_1 + eta_hor_2;
@@ -270,9 +280,7 @@ public class OblateFOV {
 
     }
 
-    /**
-     * TESTED WITH -990.945443, -5817.571039, 3334.217811
-     **/
+
     private static List<double[]> computeHalfAperture(double a_tilde, double b_tilde, double alpha_SC, double etaDeg,
                                                       double eta_hor_1, double eta_hor_2, Vector3D r_line_local) {
 
@@ -323,10 +331,6 @@ public class OblateFOV {
 
         coordinates.add(new double[]{e_P1, u_P1, 0});
         coordinates.add(new double[]{e_P2, u_P2, 0});
-
-        if (flag) {
-            flag = false;
-        }
 
         return coordinates;
 
@@ -455,10 +459,6 @@ public class OblateFOV {
             eps1 = epsilons[0];
             eps2 = epsilons[1];
 
-//            // Conversion into degrees
-//            eps1 = Math.toDegrees(epsilon_1);
-//            eps2 = Math.toDegrees(epsilon_2);
-
             if (Math.abs(epsilon - eps1) < tol && Math.abs(epsilon - eps2) < tol) {
                 break;
             }
@@ -521,39 +521,10 @@ public class OblateFOV {
         double epsilon_2 = Math.atan((m_t_P2 - m_P2) / (1 + m_t_P2 * m_P2));
 
         // Conversion into degrees
-//        epsilon_1 = Math.toDegrees(epsilon_1);
-//        epsilon_2 = Math.toDegrees(epsilon_2);
-
-        //// Determination of the tangents in P1 and P2
-//        double m_t_P1 = getTangentSlope(e_P1, u_P1, a_tilde, b_tilde);
-//        double m_t_P2 = getTangentSlope(e_P2, u_P2, a_tilde, b_tilde);
-
-        // Elevation angle computation: angle between two lines
-//        var epsilon_1 = Math.atan((-m_t_P1 + m_P1) / (1 + m_t_P1 * m_P1));
-//        var epsilon_2 = Math.atan((m_t_P2 - m_P2) / (1 + m_t_P2 * m_P2));
-
-        // Conversion into degrees
         epsilon_1 = Math.toDegrees(epsilon_1);
         epsilon_2 = Math.toDegrees(epsilon_2);
 
         return new double[]{epsilon_1, epsilon_2};
-
-    }
-
-    private static double getTangentSlope(double e_P, double u_P, double a_tilde, double b_tilde) {
-
-        // Tangent slope
-        var v0 = pow(a_tilde, 2) * sqrt(1 - pow((e_P / a_tilde), 2));
-
-        double m_t_P;
-
-        if (u_P >= 0) {     // Selection of the semi-ellipse
-            m_t_P = (-b_tilde * e_P) / v0;
-        } else {
-            m_t_P = (b_tilde * e_P) / v0;
-        }
-
-        return m_t_P;
 
     }
 
