@@ -250,7 +250,7 @@ public class D3CO implements Runnable {
         // Load ROI Data:
         List<double[]> nonEuclideanROI = geo.file2DoubleList(ROI_PATH);
         double roiSurface = geo.computeNonEuclideanSurface(nonEuclideanROI);
-        Log.debug("ROI Surface: " + roiSurface);
+        Log.info("ROI Surface: " + roiSurface);
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);

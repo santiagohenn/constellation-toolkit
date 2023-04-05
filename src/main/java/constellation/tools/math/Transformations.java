@@ -37,22 +37,6 @@ public class Transformations {
 
     }
 
-    /**
-     * Takes the a pair of geographic coordinates and transforms them into the euclidean plane
-     **/
-    public static double[] toStereo(double lat, double lon, double referenceLatRads, double referenceLonRads) {
-
-        double localR = RADIUS; // getLocalRadiusKm(Math.toRadians(lat));
-        double k = (2 * localR) / (1 + Math.sin(referenceLatRads) * Math.sin(lat) +
-                Math.cos(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-        double xStereo = k * Math.cos(lat) * Math.sin(lon - referenceLonRads);
-        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(lat) - Math.sin(referenceLatRads) * Math.cos(lat) * Math.cos(lon - referenceLonRads));
-
-        return new double[]{xStereo, yStereo};
-
-    }
-
     public static List<double[]> toNonEuclideanPlane(List<double[]> euclideanPolygon, double referenceLat, double referenceLon) {
 
         List<double[]> GCSPolygon = new ArrayList<>();
@@ -69,6 +53,22 @@ public class Transformations {
         }
 
         return GCSPolygon;
+
+    }
+
+    /**
+     * Takes a pair of geographic coordinates and transforms them into the euclidean plane
+     **/
+    public static double[] toStereo(double latRads, double lonRads, double referenceLatRads, double referenceLonRads) {
+
+        double localR = RADIUS; // getLocalRadiusKm(Math.toRadians(lat));
+        double k = (2 * localR) / (1 + Math.sin(referenceLatRads) * Math.sin(latRads) +
+                Math.cos(referenceLatRads) * Math.cos(latRads) * Math.cos(lonRads - referenceLonRads));
+
+        double xStereo = k * Math.cos(latRads) * Math.sin(lonRads - referenceLonRads);
+        double yStereo = k * (Math.cos(referenceLatRads) * Math.sin(latRads) - Math.sin(referenceLatRads) * Math.cos(latRads) * Math.cos(lonRads - referenceLonRads));
+
+        return new double[]{xStereo, yStereo};
 
     }
 
