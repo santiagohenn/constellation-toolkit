@@ -144,6 +144,10 @@ public class Geo {
      **/
     public double computeNonEuclideanSurface(List<double[]> pairList) {
 
+        if (pairList.isEmpty()) {
+            return 0;
+        }
+
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
         for (double[] pair : pairList) {

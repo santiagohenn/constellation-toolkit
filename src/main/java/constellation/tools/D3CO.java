@@ -8,6 +8,7 @@ import constellation.tools.geometry.FOV;
 import constellation.tools.geometry.Geo;
 import constellation.tools.geometry.OblateFOV;
 import constellation.tools.math.Combination;
+import constellation.tools.math.TimedMetricsRecord;
 import constellation.tools.math.Transformations;
 import constellation.tools.reports.ReportGenerator;
 import me.tongfei.progressbar.ProgressBar;
@@ -256,9 +257,11 @@ public class D3CO implements Runnable {
         AbsoluteDate startDate = Utils.stamp2AD(START_DATE);
         AbsoluteDate endDate = Utils.stamp2AD(END_DATE);
         double scenarioDuration = endDate.durationFrom(startDate);
+        long startTimestamp = stamp2unix(START_DATE);
 
         List<AAP> roiIntersections = new ArrayList<>();
         List<AAP> roiUnions = new ArrayList<>();
+        List<TimedMetricsRecord> timeSeriesData = new ArrayList<>();
         AtomicInteger changes = new AtomicInteger();
 
         tic(3);
@@ -267,7 +270,7 @@ public class D3CO implements Runnable {
             pb.maxHint((long) scenarioDuration);
             for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(TIME_STEP)) {
 
-                long timeElapsed = stamp2unix(t.toString()) - stamp2unix(START_DATE);
+                long timeElapsed = stamp2unix(t.toString()) - startTimestamp;
                 pb.stepTo((long) (Math.round(timeElapsed * 100 * 100.00 / scenarioDuration) / 100.00));
 
                 // Group regions by number of satellites on sight, for this particular time step
@@ -279,6 +282,8 @@ public class D3CO implements Runnable {
                 AtomicReference<Double> roiReferenceLat = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLat());
                 AtomicReference<Double> roiReferenceLon = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLon());
                 AtomicReference<List<double[]>> euclideanROI = new AtomicReference<>(Transformations.toEuclideanPlane(nonEuclideanROI, roiReferenceLat.get(), roiReferenceLon.get()));
+
+                TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
 
                 // Perform intersection of AAPs with the ROI and surface area values calculation
                 // For each number of assets
@@ -311,7 +316,7 @@ public class D3CO implements Runnable {
                             eIntersection = intersection.getRegions().isEmpty() ? eIntersection : intersection.getRegions().get(0);
 
                         } catch (RuntimeException e) {
-                            Log.error("Error trying to intercept the following polygon: ");
+                            Log.error("Error trying to intersect the following polygon: ");
                             aap.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
                             Log.error("### WITH ###");
                             nonEuclideanROI.forEach(c -> Log.error(c[0] + "," + c[1]));
@@ -325,6 +330,11 @@ public class D3CO implements Runnable {
                         }
 
                         List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
+
+                        // Surface for K = 1 (intersection seen by 1 GW):
+                        if (k == 1) {
+                            timedMetricsRecord.addMetric(aap.getGwsInSight().get(0), geo.computeNonEuclideanSurface(neIntersection));
+                        }
 
                         AAP intersectionAAP = new AAP(timeElapsed, k, aap.getGwsInSight(), neIntersection,
                                 neIntersection.stream().map(pair -> pair[0]).collect(Collectors.toList()),
@@ -363,6 +373,7 @@ public class D3CO implements Runnable {
                     sb.append(percentage);
                 }
 
+                timeSeriesData.add(timedMetricsRecord);
                 statistics.add(sb.toString());
 
             }
@@ -377,6 +388,7 @@ public class D3CO implements Runnable {
         }
 
         reportGenerator.saveAsCSV(statistics, "coverage");
+        reportGenerator.saveAsJSON(timeSeriesData, "surface_metrics");
 
     }
 
