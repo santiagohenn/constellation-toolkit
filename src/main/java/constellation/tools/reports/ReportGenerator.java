@@ -8,8 +8,8 @@ import java.util.List;
 
 public class ReportGenerator {
 
-    private static final String JSON_EXTENSION = ".json";
-    private static final String CSV_EXTENSION = ".csv";
+    public static final String JSON_EXTENSION = ".json";
+    public static final String CSV_EXTENSION = ".csv";
     private final String outputPath;
 
     public ReportGenerator(String outputPath) {
@@ -63,7 +63,22 @@ public class ReportGenerator {
         return true;
     }
 
-
+    /**
+     * Saves a String List to a file depicted in path
+     * @param entries the String to be stored
+     * @param name the path to the file
+     */
+    public boolean saveAs(List<String> entries, String name) {
+        try (FileWriter writer = new FileWriter(outputPath + name)) {
+            for (String entry : entries) {
+                writer.write(entry + '\n');
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
 
 
 }
