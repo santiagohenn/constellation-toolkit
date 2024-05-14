@@ -3,7 +3,7 @@ package constellation.tools;
 import constellation.tools.geometry.ConstellationSSPs;
 import constellation.tools.geometry.AccessRegion;
 import constellation.tools.math.Pair;
-import constellation.tools.reports.ReportGenerator;
+import constellation.tools.utilities.Reports;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
@@ -25,7 +25,7 @@ public class SSPProp {
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<ConstellationSSPs> constellationSSPs = new ArrayList<>();
-    ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
+    Reports reports = new Reports(OUTPUT_PATH);
 
     public SSPProp() {
 
@@ -65,7 +65,7 @@ public class SSPProp {
 
         }
 
-        reportGenerator.saveAsJSON(ssps, "ConstellationSSPs");
+        reports.saveAsJSON(ssps, "ConstellationSSPs");
 
 //        reportGenerator.saveAsJSON(constellationSSPs, "ConstellationSSPs");
 

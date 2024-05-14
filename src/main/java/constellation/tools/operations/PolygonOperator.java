@@ -16,8 +16,8 @@ public class PolygonOperator {
     /**
      * Performs the Intersection of a list of polygons
      *
-     *  @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
-     *  @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
      **/
     public Polygon polyIntersect(List<List<double[]>> polygonsToIntersect, double epsilon) {
 
@@ -65,6 +65,59 @@ public class PolygonOperator {
         }
 
         return intersection;
+
+    }
+
+
+    /**
+     * Performs the union of a list of polygons
+     *
+     * @see <a href="https://github.com/Menecats/polybool-java">Menecats-Polybool</a>
+     * @see <a href="https://www.sciencedirect.com/science/article/pii/S0965997813000379">Martinez-Rueda clipping algorithm</a>
+     **/
+    public Polygon polyUnion(List<List<double[]>> unionQueue, double polygonEpsilon) {
+
+        Polygon union = new Polygon();
+        double epsilon = polygonEpsilon;
+        int tries = 0;
+
+        while (tries < 3) {
+
+            // Union of all ROI intersections
+            try {
+                Epsilon eps = epsilon(epsilon);
+                Polygon result = polygon(unionQueue.get(0));
+                PolyBool.Segments segments = PolyBool.segments(eps, result);
+
+                for (int i = 1; i < unionQueue.size(); i++) {
+                    PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(unionQueue.get(i)));
+                    PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
+                    segments = PolyBool.selectUnion(comb);
+                }
+
+                union = PolyBool.polygon(eps, segments);
+
+                if (tries > 0) {
+                    Log.warn("Zero-length segment error recovered with epsilon " + epsilon);
+                }
+
+                break;
+
+            } catch (IndexOutOfBoundsException e1) {
+                Log.error("IndexOutOfBoundsException " + e1.getMessage());
+                Log.error("polygons to be or list size: " + unionQueue.size());
+            } catch (RuntimeException e2) {
+                Log.warn(e2.getMessage());
+                Log.warn("RuntimeException. Union size: " + unionQueue.size() + " - Increasing epsilon");
+                epsilon *= 10;
+                tries++;
+                if (tries == 3) {
+                    Log.error("Zero-length segment error could not be recovered.");
+                }
+            }
+        }
+
+        return union;
 
     }
 

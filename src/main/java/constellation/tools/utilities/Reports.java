@@ -1,18 +1,23 @@
-package constellation.tools.reports;
+package constellation.tools.utilities;
 
 import com.google.gson.Gson;
+import constellation.tools.geometry.OblateAccessRegion;
+import satellite.tools.structures.Ephemeris;
+import satellite.tools.utils.Log;
 
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-public class ReportGenerator {
+public class Reports {
 
     public static final String JSON_EXTENSION = ".json";
     public static final String CSV_EXTENSION = ".csv";
     private final String outputPath;
 
-    public ReportGenerator(String outputPath) {
+    public Reports(String outputPath) {
         if (!outputPath.endsWith("/")) {
             outputPath = outputPath + "/";
         }
@@ -80,5 +85,44 @@ public class ReportGenerator {
         return true;
     }
 
+
+    public List<Map<Long, Ephemeris>> positionsFromPath(String path, int nOfSatellites) {
+
+        List<Map<Long, Ephemeris>> constellation = new ArrayList<>();
+
+        for (int nSat = 0; nSat < nOfSatellites; nSat++) {
+            Map<Long, Ephemeris> positions = new LinkedHashMap<>();
+            var file = new File(path + "S" + nSat + "" + Reports.CSV_EXTENSION);
+            try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
+                String line;
+                int id = 0;
+                while ((line = br.readLine()) != null) {
+                    if (!line.startsWith("//") && line.length() > 0) {
+                        var data = line.split(",");
+                        long time = Long.parseLong(data[0]);
+                        double x = round(Double.parseDouble(data[1]));
+                        double y = round(Double.parseDouble(data[2]));
+                        double z = round(Double.parseDouble(data[3]));
+                        Ephemeris eph = new Ephemeris(time, x, y, z);
+                        double[] ssp = OblateAccessRegion.ecef2llaD(x, y, z);
+                        eph.setSSP(ssp[0], ssp[1], ssp[2]);
+                        positions.put(time, eph);
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                Log.warn("Unable to find file: " + file);
+                e.printStackTrace();
+            } catch (IOException e) {
+                Log.error("IOException: " + file);
+                e.printStackTrace();
+            }
+            constellation.add(positions);
+        }
+        return constellation;
+    }
+
+    private double round(double num) {
+        return Math.round(num * 1000000D) / 1000000D;
+    }
 
 }

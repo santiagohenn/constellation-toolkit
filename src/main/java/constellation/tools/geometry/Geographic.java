@@ -322,6 +322,9 @@ public class Geographic {
      */
     public List<double[]> file2DoubleList(String fileName) {
 
+        fileName = fileName.replaceAll("//", "/");
+        fileName = fileName.replaceAll("\\\\", "\\");
+
         List<double[]> pairList = new ArrayList<>();
         var file = new File(fileName);
         try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
@@ -859,6 +862,91 @@ public class Geographic {
                 + (5 * Math.pow(WGS84_E, 4) / 48 + 7 * Math.pow(WGS84_E, 6) / 80 + 697 * Math.pow(WGS84_E, 8) / 11520) * Math.sin(4 * sphericalLat)
                 + (13 * Math.pow(WGS84_E, 6) / 480 + 461 * Math.pow(WGS84_E, 8) / 13440) * Math.sin(6 * sphericalLat)
                 + (1237 * Math.pow(WGS84_E, 8) / 161280) * Math.sin(8 * sphericalLat);
+
+    }
+
+
+    /**
+     * Checks whether some FOV in the provided List contains any of Earth's poles
+     *
+     * @param regionsToIntersect A List of Regions to check
+     * @return 0 if no FOV contains either the north or South Pole, 1 if some FOV contains the North Pole,
+     * -1 if some FOV contains the South Pole
+     **/
+    private double[] getProjectionReference(List<AccessRegion> regionsToIntersect) {
+
+        double avgNorth = 0;
+        double avgSouth = 0;
+        double dToNorth = 0;
+        double dToSouth = 0;
+        int proximity = -1;
+
+        // check proximity poles
+        for (AccessRegion AccessRegion : regionsToIntersect) {
+
+            double lambda = AccessRegion.getLambdaMax();
+            dToNorth = computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), 90, 0);
+            dToSouth = computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), -90, 0);
+            avgNorth += dToNorth;
+            avgSouth += dToSouth;
+
+            if (lambda >= 45 && (dToNorth < 45 || dToSouth < 45)) {
+                return new double[]{AccessRegion.getSspLat(), AccessRegion.getSspLon()};
+            }
+
+            if (dToNorth <= lambda) {
+                return new double[]{-90, 0};
+            } else if (dToSouth <= lambda) {
+                return new double[]{90, 0};
+            }
+
+        }
+
+        return new double[]{-90, 0};
+
+    }
+
+
+    /**
+     * Checks whether some FOV in the provided List contains any of Earth's poles
+     *
+     * @param regionsToIntersect A List of Regions to check
+     * @return 0 if no FOV contains either the north or South Pole, 1 if some FOV contains the North Pole,
+     * -1 if some FOV contains the South Pole
+     **/
+    private int checkPoleDistance(List<AccessRegion> regionsToIntersect) {
+
+        double avgNorth = 0;
+        double avgSouth = 0;
+        int proximity = -1;
+
+        // check proximity poles
+        for (AccessRegion AccessRegion : regionsToIntersect) {
+
+            double lambda = AccessRegion.getLambdaMax();
+            double dToNorth = computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), 90, 0);
+            double dToSouth = computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), -90, 0);
+
+            avgNorth += dToNorth;
+            avgSouth += dToSouth;
+
+            if (dToSouth <= lambda && lambda >= 45) {
+                return -1;
+            }
+
+            if (dToNorth <= lambda && lambda >= 45) {
+                return 1;
+            }
+
+            if (dToNorth <= lambda) {
+                proximity = -1;
+            } else if (dToSouth <= lambda) {
+                proximity = 1;
+            }
+
+        }
+
+        return proximity;
 
     }
 
