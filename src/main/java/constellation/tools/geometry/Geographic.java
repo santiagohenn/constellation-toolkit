@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * Contains Geographic operations
  */
-public class Geo {
+public class Geographic {
 
     public static final double EARTH_RADIUS_EQ_M = 6378135.0D;
     public static final double WGS84_EQ_RADIUS_M = 6378137.0D;
@@ -66,23 +66,22 @@ public class Geo {
     private double Latitude;
     private double Longitude;
 
-    public Geo() {
+    public Geographic() {
 
     }
 
     /**
      * Checks whether the provided FOV contains any of Earth's poles
      *
-     * @param FOV       A List of Regions to check
-     * @param lambdaMax The Maximum Earth Central Angle of the regions to check
+     * @param AccessRegion A List of Regions to check
+     * @param lambdaMax    The Maximum Earth Central Angle of the regions to check
      * @return 0 if the FOV does not contain either the north or South Pole, 1 if it contains the North Pole,
      * -1 if it contains the South Pole
      **/
-    public int checkPoleInclusion(FOV FOV, double lambdaMax) {
-
-        if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), 90, 0) <= lambdaMax) {
+    public int checkPoleInclusion(AccessRegion AccessRegion, double lambdaMax) {
+        if (computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), 90, 0) <= lambdaMax) {
             return 1;
-        } else if (computeGeodesic(FOV.getSspLat(), FOV.getSspLon(), -90, 0) <= lambdaMax) {
+        } else if (computeGeodesic(AccessRegion.getSspLat(), AccessRegion.getSspLon(), -90, 0) <= lambdaMax) {
             return -1;
         }
         return 0;
@@ -115,7 +114,7 @@ public class Geo {
      * @param r2 the second FOV
      * @return Double the computed angular distance in degrees
      **/
-    public double computeGeodesic(FOV r1, FOV r2) {
+    public double computeGeodesic(AccessRegion r1, AccessRegion r2) {
         return computeGeodesic(r1.getSspLat(), r1.getSspLon(), r2.getSspLat(), r2.getSspLon());
     }
 
@@ -194,9 +193,9 @@ public class Geo {
      * This method returns the maximum Lambda, which is defined as the maximum Earth Central Angle or
      * half of a satellite's "cone FOV" over the surface of the Earth.
      *
-     * @param x x component of the position vector in ECEF coordinates
-     * @param y y component of the position vector in ECEF coordinates
-     * @param z z component of the position vector in ECEF coordinates
+     * @param x                   x component of the position vector in ECEF coordinates
+     * @param y                   y component of the position vector in ECEF coordinates
+     * @param z                   z component of the position vector in ECEF coordinates
      * @param visibilityThreshold the height above horizon visibility threshold in degrees
      * @return Te maximum Earth Central Angle for the access area, in degrees
      **/
@@ -336,9 +335,11 @@ public class Geo {
         } catch (FileNotFoundException e) {
             Log.error("Unable to find file: " + fileName);
             e.printStackTrace();
+            System.exit(1);
         } catch (IOException e) {
             Log.error("IOException: " + fileName);
             e.printStackTrace();
+            System.exit(1);
         }
 
         return pairList;
@@ -464,30 +465,30 @@ public class Geo {
      **/
     public static double[] toGeodetic(double xStereo, double yStereo, double referenceLatRads, double referenceLonRads) {
 
-            double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
+        double rho = Math.sqrt(Math.pow(xStereo, 2.000) + Math.pow(yStereo, 2.000));
 
-            double localRadius = Utils.EARTH_RADIUS_AVG_KM;
+        double localRadius = Utils.EARTH_RADIUS_AVG_KM;
 
-            double c = 2 * Math.atan2(rho, 2.0 * localRadius);
-            double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
-            double lon;
+        double c = 2 * Math.atan2(rho, 2.0 * localRadius);
+        double lat = Math.asin(Math.cos(c) * Math.sin(referenceLatRads) + (yStereo * Math.sin(c) * Math.cos(referenceLatRads)) / rho);
+        double lon;
 
-            // For exactly the poles, avoid indeterminate points in the equations
-            if (referenceLatRads == Math.PI) {
-                lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
-            } else if (referenceLonRads == -Math.PI) {
-                lon = referenceLonRads + Math.atan2(xStereo, yStereo);
-            } else {
-                lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
-                        - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
-            }
+        // For exactly the poles, avoid indeterminate points in the equations
+        if (referenceLatRads == Math.PI) {
+            lon = referenceLonRads + Math.atan2(xStereo, (-yStereo));
+        } else if (referenceLonRads == -Math.PI) {
+            lon = referenceLonRads + Math.atan2(xStereo, yStereo);
+        } else {
+            lon = referenceLonRads + Math.atan2((xStereo * Math.sin(c)), (rho * Math.cos(referenceLatRads) * Math.cos(c)
+                    - yStereo * Math.sin(referenceLatRads) * Math.sin(c)));
+        }
 
-            // Go back to degrees
-            lat = Math.toDegrees(lat);
-            lon = Math.toDegrees(lon);
+        // Go back to degrees
+        lat = Math.toDegrees(lat);
+        lon = Math.toDegrees(lon);
 
-            while (lon < -180D) lon += 360;
-            while (lon > 180D) lon -= 360;
+        while (lon < -180D) lon += 360;
+        while (lon > 180D) lon -= 360;
 
         return new double[]{xStereo, yStereo};
 
