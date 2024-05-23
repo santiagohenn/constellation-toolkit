@@ -11,13 +11,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Reports {
+public class FileUtils {
 
     public static final String JSON_EXTENSION = ".json";
     public static final String CSV_EXTENSION = ".csv";
     private final String outputPath;
 
-    public Reports(String outputPath) {
+    public FileUtils(String outputPath) {
         if (!outputPath.endsWith("/")) {
             outputPath = outputPath + "/";
         }
@@ -92,7 +92,7 @@ public class Reports {
 
         for (int nSat = 0; nSat < nOfSatellites; nSat++) {
             Map<Long, Ephemeris> positions = new LinkedHashMap<>();
-            var file = new File(path + "S" + nSat + "" + Reports.CSV_EXTENSION);
+            var file = new File(path + "S" + nSat + "" + FileUtils.CSV_EXTENSION);
             try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
                 String line;
                 int id = 0;
@@ -119,6 +119,39 @@ public class Reports {
             constellation.add(positions);
         }
         return constellation;
+    }
+
+    /**
+     * Reads a file containing asset(s) parameter(s) and returns a list of objects accordingly
+     *
+     * @return List<Pair>
+     */
+    public List<double[]> file2DoubleList(String fileName) {
+
+        fileName = fileName.replace("//", "/");
+        fileName = fileName.replace("\\\\", "\\");
+
+        List<double[]> pairList = new ArrayList<>();
+        var file = new File(fileName);
+        try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.startsWith("//") && line.length() > 0) {
+                    var data = line.split(",");
+                    pairList.add(new double[]{Double.parseDouble(data[0]), Double.parseDouble(data[1])});
+                }
+            }
+        } catch (FileNotFoundException e) {
+            Log.error("Unable to find file: " + fileName);
+            e.printStackTrace();
+            System.exit(1);
+        } catch (IOException e) {
+            Log.error("IOException: " + fileName);
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        return pairList;
     }
 
     private double round(double num) {

@@ -3,14 +3,14 @@ package constellation.tools;
 import com.menecats.polybool.models.Polygon;
 import constellation.tools.geometry.AccessAreaPolygon;
 import constellation.tools.geometry.AccessRegion;
-import constellation.tools.geometry.Geographic;
+import constellation.tools.geometry.GeographicTools;
 import constellation.tools.geometry.OblateAccessRegion;
 import constellation.tools.math.Combination;
 import constellation.tools.math.TimedMetricsRecord;
 import constellation.tools.math.Transformations;
 import constellation.tools.operations.PolygonOperator;
 import constellation.tools.utilities.AppConfig;
-import constellation.tools.utilities.Reports;
+import constellation.tools.utilities.FileUtils;
 import constellation.tools.utilities.TimeUtils;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.orekit.data.DataContext;
@@ -36,10 +36,10 @@ public class D3CO implements Runnable {
     private final List<String> statistics = new ArrayList<>();
     private List<Map<Long, Ephemeris>> constellation;
 
-    private AppConfig appConfig;
+    private static AppConfig appConfig;
     private Simulation simulation;
-    private Reports reports;
-    private Geographic geographic;
+    private FileUtils fileUtils;
+    private GeographicTools geographicTools;
     private PolygonOperator polygonOperator;
 
     /* Metrics */
@@ -53,17 +53,25 @@ public class D3CO implements Runnable {
      * Default constructor
      **/
     public D3CO() {
-        configure();
+        loadConfigurations();
         satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
 
-    private void configure(String configurationsFilePath) {
-
+    /**
+     * Accepts configurations (either config file or JSON)
+     **/
+    public D3CO(String configurations) {
+        loadConfigurations(configurations);
+        satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
 
-    private void configure() {
+    public void loadConfigurations() {
+        loadConfigurations("config.properties");
+    }
+
+    public void loadConfigurations(String configurationsFilePath) {
         try {
-            appConfig = new AppConfig("config.properties");
+            appConfig = new AppConfig(configurationsFilePath);
             simulation = new Simulation(appConfig.orekitPath());
             simulation.setParams(appConfig.startDate(), appConfig.endDate(), appConfig.timeStep(), appConfig.visibilityThreshold());
             simulation.setInertialFrame(FramesFactory.getEME2000());
@@ -77,8 +85,8 @@ public class D3CO implements Runnable {
             System.exit(101);
         }
 
-        reports = new Reports(appConfig.outputPath());
-        geographic = new Geographic();
+        fileUtils = new FileUtils(appConfig.outputPath());
+        geographicTools = new GeographicTools();
     }
 
     @Override
@@ -89,7 +97,7 @@ public class D3CO implements Runnable {
 
         if (!appConfig.propagateInternally()) {
             Log.debug("Reading positions from directory: " + appConfig.positionsPath());
-            constellation = reports.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
+            constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
         }
 
         List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = propagateAccessAreaPolygons();
@@ -214,8 +222,8 @@ public class D3CO implements Runnable {
         statistics.clear();
 
         // Load ROI Polygon:
-        List<double[]> nonEuclideanROI = geographic.file2DoubleList(appConfig.roiPath());
-        double roiSurface = geographic.computeNonEuclideanSurface(nonEuclideanROI);
+        List<double[]> nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
+        double roiSurface = geographicTools.computeNonEuclideanSurface(nonEuclideanROI);
         Log.info("ROI Surface: " + roiSurface);
 
         // Timekeeping
@@ -292,7 +300,7 @@ public class D3CO implements Runnable {
 
                     // Surface for K = 1 (intersection seen by 1 GW):
                     if (k == 1) {
-                        timedMetricsRecord.addMetric(accessAreaPolygon.getGwsInSight().get(0), geographic.computeNonEuclideanSurface(neIntersection));
+                        timedMetricsRecord.addMetric(accessAreaPolygon.getGwsInSight().get(0), geographicTools.computeNonEuclideanSurface(neIntersection));
                     }
 
                     AccessAreaPolygon intersectionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, accessAreaPolygon.getGwsInSight(), neIntersection,
@@ -308,7 +316,7 @@ public class D3CO implements Runnable {
                         union = polygonOperator.polyUnion(union.getRegions());  // Second union if some polygons got clipped out
                         union.getRegions().forEach(region -> {
                             List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                            surfaceValues[k - 1] = surfaceValues[k - 1] + geographic.computeNonEuclideanSurface(neIntersection);
+                            surfaceValues[k - 1] = surfaceValues[k - 1] + geographicTools.computeNonEuclideanSurface(neIntersection);
                             AccessAreaPolygon unionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, null, neIntersection,
                                     neIntersection.stream().map(pair -> pair[0]).toList(),
                                     neIntersection.stream().map(pair -> pair[1]).toList());
@@ -343,8 +351,8 @@ public class D3CO implements Runnable {
             saveAAPsAt(roiUnions, "snapshot_aaps_union", appConfig.snapshot());
         }
 
-        reports.saveAsCSV(statistics, "coverage_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
-        reports.saveAsJSON(timeSeriesData, "surface_metrics");
+        fileUtils.saveAsCSV(statistics, "coverage_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
+        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics");
 
     }
 
@@ -372,7 +380,7 @@ public class D3CO implements Runnable {
             int finalNOfGw = nOfGw;
 
             try {
-                reports.saveAsJSON(accessAreaPolygons.stream()
+                fileUtils.saveAsJSON(accessAreaPolygons.stream()
                         .filter(aap -> aap.getnOfGwsInSight() == finalNOfGw).toList(), fileName + "_" + nOfGw);
             } catch (IllegalArgumentException e) {
                 accessAreaPolygons.stream()
@@ -387,7 +395,7 @@ public class D3CO implements Runnable {
     }
 
     private void saveAAPsAt(List<AccessAreaPolygon> accessAreaPolygons, String fileName, long time) {
-        reports.saveAsJSON(accessAreaPolygons.stream()
+        fileUtils.saveAsJSON(accessAreaPolygons.stream()
                 .filter(aap -> aap.getDate() == time).toList(), fileName);
     }
 
@@ -430,7 +438,7 @@ public class D3CO implements Runnable {
                 e.printStackTrace();
             }
 
-            double lambdaMax = geographic.getLambdaMax(x, y, z, appConfig.visibilityThreshold());
+            double lambdaMax = geographicTools.getLambdaMax(x, y, z, appConfig.visibilityThreshold());
 
             List<double[]> poly = OblateAccessRegion.drawLLAConic(x, y, z, appConfig.visibilityThreshold(), 1E-4, appConfig.polygonSegments());
 
@@ -471,7 +479,7 @@ public class D3CO implements Runnable {
 
             double lambda1 = accessRegions.get(r1Idx).getLambdaMax();
             double lambda2 = accessRegions.get(r2Idx).getLambdaMax();
-            double distance = geographic.computeGeodesic(accessRegions.get(r1Idx), accessRegions.get(r2Idx));
+            double distance = geographicTools.computeGeodesic(accessRegions.get(r1Idx), accessRegions.get(r2Idx));
 
             if (distance >= (lambda1 + lambda2) * (1 + appConfig.lambdaExclusion() / 100.0)) {
                 return false;
