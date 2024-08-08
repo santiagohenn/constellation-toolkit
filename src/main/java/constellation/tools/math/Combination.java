@@ -1,6 +1,7 @@
 package constellation.tools.math;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Combination {
@@ -18,12 +19,17 @@ public class Combination {
         this.maximumSizeOfSubset = maximumSizeOfSubset;
     }
 
-    /* inputSet[]  ---> Input Array
-        data[] ---> Temporary array to store current combination
-        start & end ---> Staring and Ending indexes in inputSet[]
-        index  ---> Current index in data[]
-        sizeOfSubset ---> Size of a combination to be printed */
-    private void combinationUtil(int[] inputSet, int n, int sizeOfSubset, int index, int[] data, int i) {
+    /**
+     * Generates all combinations of a given size from the input set.
+     *
+     * @param inputSet          the input array
+     * @param inputArraySize    the size of the input array
+     * @param sizeOfSubset  the size of each combination to be generated
+     * @param index         the current index in the temporary array
+     * @param data          the temporary array to store the current combination
+     * @param i             the current index in the input array
+     */
+    private void combinationUtil(int[] inputSet, int inputArraySize, int sizeOfSubset, int index, int[] data, int i) {
         // Current combination is ready to be saved, save it
         if (index == sizeOfSubset) {
             List<Integer> subset = new ArrayList<>();
@@ -38,26 +44,28 @@ public class Combination {
         }
 
         // When no more elements are there to put in data[]
-        if (i >= n)
+        if (i >= inputArraySize)
             return;
 
         // current is included, put next at next location
         data[index] = inputSet[i];
-        combinationUtil(inputSet, n, sizeOfSubset, index + 1, data, i + 1);
+        combinationUtil(inputSet, inputArraySize, sizeOfSubset, index + 1, data, i + 1);
 
         // current is excluded, replace it with next (Note that
         // i+1 is passed, but index is not changed)
-        combinationUtil(inputSet, n, sizeOfSubset, index, data, i + 1);
+        combinationUtil(inputSet, inputArraySize, sizeOfSubset, index, data, i + 1);
     }
 
-    // The main function that prints all combinations of size r
-    // in arr[] of size n. This function mainly uses combinationUtil()
-    private void computeCombinations(int[] arr, int r) {
-        // A temporary array to store all combination one by one
-        int[] data = new int[r];
-
-        // Print all combination using temporary array 'data[]'
-        combinationUtil(arr, arr.length, r, 0, data, 0);
+    /**
+     * The main function that computes all combinations of a specified size from the given array.
+     * This function uses combinationUtil() to generate the combinations.
+     *
+     * @param inputArray the input array from which combinations are to be generated
+     * @param sizeOfEachCombination   the size of each combination
+     */
+    private void computeCombinations(int[] inputArray, int sizeOfEachCombination) {
+        int[] data = new int[sizeOfEachCombination];
+        combinationUtil(inputArray, inputArray.length, sizeOfEachCombination, 0, data, 0);
     }
 
     public List<List<Integer>> computeCombinations() {

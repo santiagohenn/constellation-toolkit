@@ -2,7 +2,7 @@ package constellation.tools.geometry;
 
 import java.util.List;
 
-public class FOV {
+public class AccessRegion {
 
     private double sspLat;
     private double sspLon;
@@ -15,18 +15,18 @@ public class FOV {
     private double y;
     private double z;
 
-    public FOV() {
+    public AccessRegion() {
 
     }
 
-    public FOV(int satId, double centerLat, double centerLong, List<double[]> polygon) {
+    public AccessRegion(int satId, double centerLat, double centerLong, List<double[]> polygon) {
         this.satId = satId;
         this.sspLat = centerLat;
         this.sspLon = centerLong;
         this.polygonCoordinates = polygon;
     }
 
-    public FOV(int satId, double centerLat, double centerLong, double height, List<double[]> polygon) {
+    public AccessRegion(int satId, double centerLat, double centerLong, double height, List<double[]> polygon) {
         this.satId = satId;
         this.sspLat = centerLat;
         this.sspLon = centerLong;

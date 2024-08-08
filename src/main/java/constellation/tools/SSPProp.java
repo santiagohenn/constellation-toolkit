@@ -1,9 +1,9 @@
 package constellation.tools;
 
 import constellation.tools.geometry.ConstellationSSPs;
-import constellation.tools.geometry.FOV;
+import constellation.tools.geometry.AccessRegion;
 import constellation.tools.math.Pair;
-import constellation.tools.reports.ReportGenerator;
+import constellation.tools.utilities.FileUtils;
 import org.orekit.time.AbsoluteDate;
 import satellite.tools.Simulation;
 import satellite.tools.assets.entities.Satellite;
@@ -25,7 +25,7 @@ public class SSPProp {
     private final String SATELLITES_FILE = (String) prop.get("satellites_file");
     private final List<Satellite> satelliteList = Utils.satellitesFromFile(SATELLITES_FILE);
     private final List<ConstellationSSPs> constellationSSPs = new ArrayList<>();
-    ReportGenerator reportGenerator = new ReportGenerator(OUTPUT_PATH);
+    FileUtils fileUtils = new FileUtils(OUTPUT_PATH);
 
     public SSPProp() {
 
@@ -40,26 +40,34 @@ public class SSPProp {
         AbsoluteDate pointerDate = startDate;
         double scenarioDuration = endDate.durationFrom(startDate);
 
+        List<ArrayList<Pair>> ssps = new ArrayList<>();
+        satelliteList.forEach(satellite -> ssps.add(new ArrayList<>()));
+
         while (pointerDate.compareTo(endDate) <= 0) {
 
-            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
+//            long timeSinceStart = Utils.stamp2unix(pointerDate.toString()) - Utils.stamp2unix(START_DATE);
             updateProgressBar(pointerDate.durationFrom(startDate), scenarioDuration);
 
             // Obtain the starting non-euclidean FOVs and their surface value
-            List<FOV> nonEuclideanFOVs = computeSSPsAt(satelliteList, simulation, pointerDate);
+            List<AccessRegion> nonEuclideanAccessRegions = computeSSPsAt(satelliteList, simulation, pointerDate);
 
             // Store the SSPs (per Guido's request)
-            List<Pair> SSPs = new ArrayList<>();
+//            List<Pair> SSPs = new ArrayList<>();
 
-            nonEuclideanFOVs.forEach(FOV -> SSPs.add(new Pair(FOV.getSspLat(), FOV.getSspLon())));
-            constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
+            nonEuclideanAccessRegions.forEach(accessRegion -> ssps.get(accessRegion.getSatId()).add(new Pair(accessRegion.getSspLat(), accessRegion.getSspLon())));
+
+//                SSPs.add(new Pair(fov.getSspLat(), fov.getSspLon()))});
+
+//            constellationSSPs.add(new ConstellationSSPs(timeSinceStart, SSPs));
 
             // Advance to the next time step
             pointerDate = pointerDate.shiftedBy(TIME_STEP);
 
         }
 
-        reportGenerator.saveAsJSON(constellationSSPs, "ConstellationSSPs");
+        fileUtils.saveAsJSON(ssps, "ConstellationSSPs");
+
+//        reportGenerator.saveAsJSON(constellationSSPs, "ConstellationSSPs");
 
     }
 
@@ -71,24 +79,24 @@ public class SSPProp {
      * @param date          an AbsoluteDate object
      * @return a List of Regions
      **/
-    private List<FOV> computeSSPsAt(List<Satellite> satelliteList, Simulation simulation, AbsoluteDate date) {
+    private List<AccessRegion> computeSSPsAt(List<Satellite> satelliteList, Simulation simulation, AbsoluteDate date) {
 
-        List<FOV> FOVList = new ArrayList<>();
+        List<AccessRegion> AccessRegionList = new ArrayList<>();
 
         for (Satellite satellite : satelliteList) {
             simulation.setSatellite(satellite);
             Ephemeris ephemeris = simulation.computeFixedEphemerisKm(date);
-            FOV FOV = new FOV(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), null);
-            FOVList.add(FOV);
+            AccessRegion AccessRegion = new AccessRegion(satellite.getId(), ephemeris.getLatitude(), ephemeris.getLongitude(), null);
+            AccessRegionList.add(AccessRegion);
         }
 
-        return FOVList;
+        return AccessRegionList;
 
     }
 
     /**
      * Rudimentary progress bar.
-     * **/
+     **/
     private void updateProgressBar(double current, double total) {
 
         double progress = Math.round(current * 100 * 100.00 / total) / 100.00;

@@ -2,7 +2,7 @@ package constellation.tools.geometry;
 
 import java.util.List;
 
-public class AAP {
+public class AccessAreaPolygon {
 
     private long date;
     private int nOfGwsInSight;
@@ -14,21 +14,17 @@ public class AAP {
     private double referenceLat;
     private double referenceLon;
 
-    public AAP() {
-
-    }
-
-    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+    public AccessAreaPolygon(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
             , List<Double> lats, List<Double> longs) {
         this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0, 0, 0);
     }
 
-    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+    public AccessAreaPolygon(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
             , List<Double> lats, List<Double> longs, double referenceLat, double referenceLon) {
         this(date, nOfGwsInSight, gwsInSight, nonEuclideanCoordinates, lats, longs, 0, referenceLat, referenceLon);
     }
 
-    public AAP(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
+    public AccessAreaPolygon(long date, int nOfGwsInSight, List<Integer> gwsInSight, List<double[]> nonEuclideanCoordinates
             , List<Double> lats, List<Double> longs, double surfaceInKm2, double referenceLat, double referenceLon) {
         this.date = date;
         this.nOfGwsInSight = nOfGwsInSight;
