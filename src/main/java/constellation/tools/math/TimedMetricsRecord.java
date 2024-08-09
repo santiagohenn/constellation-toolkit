@@ -14,6 +14,12 @@ public class TimedMetricsRecord {
         metrics[assetID] = surfaceValue;
     }
 
+    public void scale(double factor) {
+        for (int i = 0; i < metrics.length; i++) {
+            metrics[i] *= factor;
+        }
+    }
+
     public long getTime() {
         return time;
     }

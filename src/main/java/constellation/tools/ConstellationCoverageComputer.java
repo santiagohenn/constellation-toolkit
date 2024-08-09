@@ -99,7 +99,7 @@ public class ConstellationCoverageComputer {
 
     public void run() {
 
-        Log.info("Satellites: " + '\n' + satelliteList.stream().map(s -> "[INFO] "
+        Log.info("Constellation: " + '\n' + satelliteList.stream().map(s -> "Id: " + s.getId() + " -> "
                 + s.getElements().toString() + '\n').toList() + '\n');
 
         if (!appConfig.propagateInternally()) {
@@ -231,9 +231,6 @@ public class ConstellationCoverageComputer {
         double roiSurface = geographicTools.computeNonEuclideanSurface(nonEuclideanROI);
         Log.info("ROI Surface: " + roiSurface);
 
-        // Test code
-        Log.info("ROI Surface 2: " + geographicTools.computeNonEuclideanSurface(geographicTools.computeSphericalCap(7.1946, -21.0, -58.0, 200)));
-
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
         AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate());
@@ -335,7 +332,6 @@ public class ConstellationCoverageComputer {
                         Log.error("Regions size?: " + unionQueue.size());
                         e.printStackTrace();
                     }
-
                 }
             });
 
@@ -347,6 +343,7 @@ public class ConstellationCoverageComputer {
                 sb.append(percentage);
             }
 
+            timedMetricsRecord.scale(1 / roiSurface);
             timeSeriesData.add(timedMetricsRecord);
             statistics.add(sb.toString());
 
@@ -360,7 +357,7 @@ public class ConstellationCoverageComputer {
         }
 
         fileUtils.saveAsCSV(statistics, "coverage_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
-        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics");
+        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
 
     }
 
