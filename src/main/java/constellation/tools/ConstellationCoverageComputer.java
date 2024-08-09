@@ -30,11 +30,12 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Dynamic Constellation Coverage Computer (D3CO)
  **/
-public class D3CO implements Runnable {
+public class ConstellationCoverageComputer {
 
     private List<Satellite> satelliteList;
     private final List<String> statistics = new ArrayList<>();
     private List<Map<Long, Ephemeris>> constellation;
+    private List<double[]> nonEuclideanROI;
 
     private static AppConfig appConfig;
     private Simulation simulation;
@@ -52,7 +53,7 @@ public class D3CO implements Runnable {
     /**
      * Default constructor
      **/
-    public D3CO() {
+    public ConstellationCoverageComputer() {
         loadConfigurations();
         satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
@@ -60,11 +61,14 @@ public class D3CO implements Runnable {
     /**
      * Accepts configurations (either config file or JSON)
      **/
-    public D3CO(String configurations) {
+    public ConstellationCoverageComputer(String configurations) {
         loadConfigurations(configurations);
         satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
 
+    /**
+     * Attempts to locate and load configuration.properties on root
+     **/
     public void loadConfigurations() {
         loadConfigurations("config.properties");
     }
@@ -72,24 +76,27 @@ public class D3CO implements Runnable {
     public void loadConfigurations(String configurationsFilePath) {
         try {
             appConfig = new AppConfig(configurationsFilePath);
+            fileUtils = new FileUtils(appConfig.outputPath());
             simulation = new Simulation(appConfig.orekitPath());
             simulation.setParams(appConfig.startDate(), appConfig.endDate(), appConfig.timeStep(), appConfig.visibilityThreshold());
             simulation.setInertialFrame(FramesFactory.getEME2000());
             simulation.setFixedFrame(FramesFactory.getITRF(IERSConventions.IERS_2010, true));
             polygonOperator = new PolygonOperator(appConfig.polygonEpsilon());
+            if (appConfig.useRoiFile()) {
+                nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
+            }
         } catch (ConfigurationException e) {
-            Log.error("Error trying to load configurations. ");
+            Log.error("Error trying to load configurations. Exiting. " + e.getMessage());
             System.exit(100);
         } catch (Exception e) {
-            Log.warn("Error trying to instance the simulation. ");
+            Log.error("Error trying to instance the simulation. Exiting. ");
+            e.printStackTrace();
             System.exit(101);
         }
 
-        fileUtils = new FileUtils(appConfig.outputPath());
         geographicTools = new GeographicTools();
     }
 
-    @Override
     public void run() {
 
         Log.info("Satellites: " + '\n' + satelliteList.stream().map(s -> "[INFO] "
@@ -221,10 +228,11 @@ public class D3CO implements Runnable {
 
         statistics.clear();
 
-        // Load ROI Polygon:
-        List<double[]> nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
         double roiSurface = geographicTools.computeNonEuclideanSurface(nonEuclideanROI);
         Log.info("ROI Surface: " + roiSurface);
+
+        // Test code
+        Log.info("ROI Surface 2: " + geographicTools.computeNonEuclideanSurface(geographicTools.computeSphericalCap(7.1946, -21.0, -58.0, 200)));
 
         // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
@@ -401,7 +409,7 @@ public class D3CO implements Runnable {
 
     /**
      * This method takes the satellite list, propagates orbits to the specified date and computes the corresponding
-     * access area or FOV polygon for each one.
+     * Oblate Access Region for each one.
      *
      * @param satelliteList a list of Satellite objects
      * @param date          an AbsoluteDate object
@@ -486,6 +494,10 @@ public class D3CO implements Runnable {
             }
         }
         return true;
+    }
+
+    public void setROI(List<double[]> roiPolygonInGeoCoordinates) {
+        this.nonEuclideanROI = roiPolygonInGeoCoordinates;
     }
 
     public List<Satellite> getSatelliteList() {
