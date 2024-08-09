@@ -150,8 +150,6 @@ public class GeographicTools {
 
     }
 
-    // TODO change getLambda name and add a method without the threshold
-
     /**
      * Returns the maximum Lambda for a circular (or otherwise not specified eccentricity) orbit, which is defined as
      * the maximum Earth Central Angle or half of a satellite's "cone FOV" over the surface of the Earth.
@@ -210,7 +208,7 @@ public class GeographicTools {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public List<double[]> drawSphericalAAP(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public static List<double[]> computeSphericalCap(double lambdaMax, double centerLat, double centerLon, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 
@@ -760,6 +758,5 @@ public class GeographicTools {
                 + (1237 * Math.pow(WGS84_E, 8) / 161280) * Math.sin(8 * sphericalLat);
 
     }
-
 
 }

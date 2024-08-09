@@ -16,6 +16,7 @@ public record AppConfig(
         double timeStep,
         String outputPath,
         String satellitesFile,
+        boolean useRoiFile,
         String roiPath,
         String positionsPath,
         boolean saveSnapshot,
@@ -30,6 +31,7 @@ public record AppConfig(
         double lambdaExclusion,
         int maxSubsetSize
 ) {
+
     public AppConfig(String configFilePath) throws ConfigurationException {
         this(loadConfiguration(configFilePath));
     }
@@ -43,6 +45,7 @@ public record AppConfig(
                 config.getDouble("time_step_seconds"),
                 config.getString("output_path"),
                 config.getString("satellites_file"),
+                config.getBoolean("use_roi_file"),
                 config.getString("roi_path"),
                 config.getString("positions_path"),
                 shouldSaveSnapshot(config.getString("save_snapshot")),
