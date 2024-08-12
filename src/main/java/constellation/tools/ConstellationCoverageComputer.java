@@ -23,6 +23,7 @@ import satellite.tools.structures.Ephemeris;
 import satellite.tools.utils.Log;
 import satellite.tools.utils.Utils;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -491,6 +492,22 @@ public class ConstellationCoverageComputer {
             }
         }
         return true;
+    }
+
+    public void setOutputPath(String outputPath) {
+
+        File directory = new File(outputPath);
+
+        if (!directory.exists()) {
+            if (directory.mkdirs()) {
+                Log.info("Output directory didn't exist, so it was created.");
+            } else {
+                Log.error("Failed to create the output directory.");
+            }
+        }
+
+        fileUtils = new FileUtils(outputPath);
+
     }
 
     public void setROI(List<double[]> roiPolygonInGeoCoordinates) {

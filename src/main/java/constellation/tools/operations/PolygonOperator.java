@@ -40,10 +40,17 @@ public class PolygonOperator {
             // Union of all ROI intersections
             try {
 
+                if (polygonsToIntersect.size() < 2) {
+                    return intersection;
+                }
+
                 Epsilon eps = epsilon(epsilonToleranceForOperations);
                 Polygon result = polygon(polygonsToIntersect.get(0));
                 PolyBool.Segments segments = PolyBool.segments(eps, result);
                 for (int i = 1; i < polygonsToIntersect.size(); i++) {
+                    if (polygonsToIntersect.get(i).size() < 3) {
+                        continue;
+                    }
                     PolyBool.Segments seg2 = PolyBool.segments(eps, polygon(polygonsToIntersect.get(i)));
                     PolyBool.Combined comb = PolyBool.combine(eps, segments, seg2);
                     segments = PolyBool.selectIntersect(comb);
@@ -58,7 +65,9 @@ public class PolygonOperator {
                 break;
 
             } catch (IndexOutOfBoundsException e1) {
-                Log.error("IndexOutOfBoundsException " + e1.getMessage());
+                Log.error("IndexOutOfBoundsException " + e1.getMessage() + " for " + polygonsToIntersect.size() + " regions");
+                polygonsToIntersect.forEach(polygon -> Log.error("Poly size " + polygon.size()));
+                e1.printStackTrace();
             } catch (RuntimeException e2) {
                 Log.warn(e2.getMessage());
                 Log.warn("RuntimeException. - Increasing epsilon");
