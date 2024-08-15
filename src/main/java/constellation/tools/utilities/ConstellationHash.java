@@ -27,7 +27,7 @@ public class ConstellationHash {
         }
     }
 
-    public static String hashConstellation(List<Satellite> constellation) {
+    public static String hash(List<Satellite> constellation) {
 
         StringBuilder sb = new StringBuilder();
         int[] elementsSum = new int[6];

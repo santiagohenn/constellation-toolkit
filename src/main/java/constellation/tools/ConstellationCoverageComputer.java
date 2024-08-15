@@ -10,6 +10,7 @@ import constellation.tools.math.TimedMetricsRecord;
 import constellation.tools.math.Transformations;
 import constellation.tools.operations.PolygonOperator;
 import constellation.tools.utilities.AppConfig;
+import constellation.tools.utilities.ConstellationHash;
 import constellation.tools.utilities.FileUtils;
 import constellation.tools.utilities.TimeUtils;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -43,7 +44,7 @@ public class ConstellationCoverageComputer {
     private FileUtils fileUtils;
     private GeographicTools geographicTools;
     private PolygonOperator polygonOperator;
-    private int simulationHash;
+    private String simulationHash;
 
     /* Metrics */
     int avoidedDueToNotIntersectingCount = 0;
@@ -101,8 +102,8 @@ public class ConstellationCoverageComputer {
 
     public void run() {
 
-        Log.info("Constellation: " + '\n' + satelliteList.stream().map(s -> "Id: " + s.getId() + " -> "
-                + s.getElements().toString() + '\n').toList() + '\n');
+        setSimulationHash(ConstellationHash.hash(satelliteList));
+        Log.info("Simulation hash: " + this.simulationHash);
 
         if (!appConfig.propagateInternally()) {
             Log.debug("Reading positions from directory: " + appConfig.positionsPath());
@@ -132,9 +133,7 @@ public class ConstellationCoverageComputer {
 
             // Obtain the starting non-euclidean FOVs
             List<AccessRegion> nonEuclideanAccessRegions = computeAccessRegionsAt(satelliteList, simulation, date, timeElapsed);
-
             computeIntersections(combinationsList, nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons, timeElapsed, nonEuclideanAccessRegions);
-
             Log.debug("Performed: " + polyOperationsPerformedCount + " - Avoided: " + avoidedDueToNotIntersectingCount + " - Escaped: " + polyOperationsThatResultedInEmptyIntersection);
 
         }
@@ -147,16 +146,16 @@ public class ConstellationCoverageComputer {
     private void writePolygonsToFile(List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons, List<AccessAreaPolygon> euclideanAccessAreaPolygons) {
 
         if (appConfig.saveGeographic())
-            saveAAPs(nonEuclideanAccessAreaPolygons, "ne_polygons");
+            saveAAPs(nonEuclideanAccessAreaPolygons, "ne_polygons_" + simulationHash);
 
         if (appConfig.saveEuclidean())
-            saveAAPs(euclideanAccessAreaPolygons, "e_polygons");
+            saveAAPs(euclideanAccessAreaPolygons, "e_polygons_" + simulationHash);
 
         if (appConfig.saveSnapshot())
-            saveAAPsAt(nonEuclideanAccessAreaPolygons, "snapshot_ne_polygons", appConfig.snapshot());
+            saveAAPsAt(nonEuclideanAccessAreaPolygons, "snapshot_ne_polygons_" + simulationHash, appConfig.snapshot());
 
         if (appConfig.saveSnapshot() && appConfig.saveEuclidean())
-            saveAAPsAt(euclideanAccessAreaPolygons, "snapshot_e_polygons", appConfig.snapshot());
+            saveAAPsAt(euclideanAccessAreaPolygons, "snapshot_e_polygons_" + simulationHash, appConfig.snapshot());
 
     }
 
@@ -354,12 +353,12 @@ public class ConstellationCoverageComputer {
         Log.debug("Changes: " + changes);
 
         if (appConfig.saveGeographic() && appConfig.saveSnapshot()) {
-            saveAAPsAt(roiIntersections, "snapshot_aaps_intersection", appConfig.snapshot());
-            saveAAPsAt(roiUnions, "snapshot_aaps_union", appConfig.snapshot());
+            saveAAPsAt(roiIntersections, "snapshot_aaps_intersection_" + simulationHash, appConfig.snapshot());
+            saveAAPsAt(roiUnions, "snapshot_aaps_union_" + simulationHash, appConfig.snapshot());
         }
 
-        fileUtils.saveAsCSV(statistics, "coverage_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
-        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics_" + (int) (satelliteList.get(0).getElements().getSemiMajorAxis() / 1000.0));
+        fileUtils.saveAsCSV(statistics, "coverage_" + simulationHash);
+        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics_" + simulationHash);
 
     }
 
@@ -523,11 +522,11 @@ public class ConstellationCoverageComputer {
         this.satelliteList = satelliteList;
     }
 
-    private void setSimulationHash(int simulationHash) {
+    private void setSimulationHash(String simulationHash) {
         this.simulationHash = simulationHash;
     }
 
-    private int getSimulationHash() {
+    public String getSimulationHash() {
         return this.simulationHash;
     }
 
