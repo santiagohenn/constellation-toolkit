@@ -43,6 +43,7 @@ public class ConstellationCoverageComputer {
     private FileUtils fileUtils;
     private GeographicTools geographicTools;
     private PolygonOperator polygonOperator;
+    private int simulationHash;
 
     /* Metrics */
     int avoidedDueToNotIntersectingCount = 0;
@@ -521,4 +522,13 @@ public class ConstellationCoverageComputer {
     public void setSatelliteList(List<Satellite> satelliteList) {
         this.satelliteList = satelliteList;
     }
+
+    private void setSimulationHash(int simulationHash) {
+        this.simulationHash = simulationHash;
+    }
+
+    private int getSimulationHash() {
+        return this.simulationHash;
+    }
+
 }
