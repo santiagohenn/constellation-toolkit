@@ -26,6 +26,7 @@ import satellite.tools.utils.Utils;
 
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -85,6 +86,7 @@ public class ConstellationCoverageComputer {
             simulation.setInertialFrame(FramesFactory.getEME2000());
             simulation.setFixedFrame(FramesFactory.getITRF(IERSConventions.IERS_2010, true));
             polygonOperator = new PolygonOperator(appConfig.polygonEpsilon());
+
             if (appConfig.useRoiFile()) {
                 nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
             }
@@ -102,7 +104,7 @@ public class ConstellationCoverageComputer {
 
     public void run() {
 
-        setSimulationHash(ConstellationHash.hash(satelliteList));
+        setSimulationHash(ConstellationHash.hash2(satelliteList));
         Log.info("Simulation hash: " + this.simulationHash);
 
         if (!appConfig.propagateInternally()) {
@@ -242,12 +244,13 @@ public class ConstellationCoverageComputer {
         List<TimedMetricsRecord> timeSeriesData = new ArrayList<>();
         AtomicInteger changes = new AtomicInteger();
 
+        Log.info("Analyzing ROI coverage");
         for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(appConfig.timeStep())) {
 
             long timeElapsed = TimeUtils.stamp2unix(t.toString()) - startTimestamp;
 
             // Group regions by number of satellites on sight, for this particular time step
-            Map<Integer, List<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
+            Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
 
             double[] surfaceValues = new double[satelliteList.size()];
 
@@ -260,6 +263,7 @@ public class ConstellationCoverageComputer {
 
             // Perform intersection of AAPs with the ROI and surface area values calculation
             // For each number of assets
+
             byAssetsInSight.forEach((k, aaps) -> {
 
                 // TODO: Generalize for any ROI
@@ -277,7 +281,7 @@ public class ConstellationCoverageComputer {
                 List<List<double[]>> unionQueue = new ArrayList<>();
 
                 // For each AAP with this number of assets in sight
-                aaps.forEach(accessAreaPolygon -> {
+                aaps.parallelStream().forEach(accessAreaPolygon -> {
 
                     List<double[]> eIntersection = new ArrayList<>();
 
@@ -349,6 +353,7 @@ public class ConstellationCoverageComputer {
             statistics.add(sb.toString());
 
         }
+        Log.info("Ending ROI coverage analysis");
 
         Log.debug("Changes: " + changes);
 
@@ -362,15 +367,15 @@ public class ConstellationCoverageComputer {
 
     }
 
-    private Map<Integer, List<AccessAreaPolygon>> mapByNOfAssets(List<AccessAreaPolygon> accessAreaPolygons, long timeElapsed) {
+    private Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> mapByNOfAssets(List<AccessAreaPolygon> accessAreaPolygons, long timeElapsed) {
 
-        Map<Integer, List<AccessAreaPolygon>> byAssetsInSight = new LinkedHashMap<>(appConfig.maxSubsetSize());
+        Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = new LinkedHashMap<>(appConfig.maxSubsetSize());
         accessAreaPolygons.stream().filter(aap -> aap.getDate() == timeElapsed).forEach(aap -> {
             int nAssets = aap.getnOfGwsInSight();
             if (byAssetsInSight.containsKey(nAssets)) {
                 byAssetsInSight.get(nAssets).add(aap);
             } else {
-                List<AccessAreaPolygon> accessAreaPolygonList = new ArrayList<>();
+                CopyOnWriteArrayList<AccessAreaPolygon> accessAreaPolygonList = new CopyOnWriteArrayList<>();
                 accessAreaPolygonList.add(aap);
                 byAssetsInSight.put(nAssets, accessAreaPolygonList);
             }
