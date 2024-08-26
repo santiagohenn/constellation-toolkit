@@ -8,7 +8,9 @@ public class Main {
 
     public static void main(String[] args) {
 
-        List<double[]> ROI = GeographicTools.computeSphericalCap(8, 0.0, -8.0, 150);
+//        List<double[]> ROI = GeographicTools.computeSphericalCap(8, 0.0, -8.0, 150);
+//        List<double[]> ROI = GeographicTools.computeSphericalCap( 8, 30, -7.4, 150);
+        List<double[]> ROI = GeographicTools.computeSphericalCap( 8, 60, -7, 150);
         ConstellationCoverageComputer constellationCoverageComputer = new ConstellationCoverageComputer("C:\\Users\\Santi\\Desktop\\Doctorado\\d3co_analysis\\config.d3co.properties");
         constellationCoverageComputer.setROI(ROI);
 

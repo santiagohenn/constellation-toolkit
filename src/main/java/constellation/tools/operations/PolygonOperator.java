@@ -93,6 +93,13 @@ public class PolygonOperator {
     public Polygon polyUnion(List<List<double[]>> unionQueue) {
 
         Polygon union = new Polygon();
+
+        if (unionQueue.size() == 0) {
+            return union;
+        }  else if (unionQueue.size() == 1) {
+            return polygon(unionQueue.get(0));
+        }
+
         int tries = 0;
 
         while (tries < 3) {

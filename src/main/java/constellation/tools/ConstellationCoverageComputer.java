@@ -292,6 +292,10 @@ public class ConstellationCoverageComputer {
                         Polygon intersection = polygonOperator.polyIntersect(polygonAndROI);
                         eIntersection = intersection.getRegions().isEmpty() ? eIntersection : intersection.getRegions().get(0);
 
+                        if (intersection.getRegions().size() > 1) {
+                            Log.warn("More than 1 intersection!!!");
+                        }
+
                     } catch (RuntimeException e) {
                         Log.error("Error trying to intersect the following polygon: ");
                         accessAreaPolygon.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
