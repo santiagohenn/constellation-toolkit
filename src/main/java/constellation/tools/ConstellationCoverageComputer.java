@@ -117,13 +117,28 @@ public class ConstellationCoverageComputer {
 
     }
 
+    public void computeEarthCoverage() {
+
+        setSimulationHash(ConstellationHash.hash2(satelliteList));
+        Log.info("Simulation hash: " + this.simulationHash);
+
+        if (!appConfig.propagateInternally()) {
+            Log.debug("Reading positions from directory: " + appConfig.positionsPath());
+            constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
+        }
+
+        List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = propagateAccessAreaPolygons();
+        analyzeConstellationCoverage(nonEuclideanAccessAreaPolygons);
+
+    }
+
     private List<AccessAreaPolygon> propagateAccessAreaPolygons() {
 
         AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
         AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate(), DataContext.getDefault().getTimeScales().getUTC());
 
         // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
-        Combination comb = new Combination(satelliteList.size(), appConfig.maxSubsetSize());
+        Combination comb = new Combination(satelliteList.size(), Math.min(appConfig.maxSubsetSize(), satelliteList.size()));
         final List<List<Integer>> combinationsList = comb.computeCombinations();
 
         List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = new ArrayList<>();
@@ -371,9 +386,61 @@ public class ConstellationCoverageComputer {
 
     }
 
+    public void analyzeConstellationCoverage(List<AccessAreaPolygon> accessAreaPolygons) {
+
+        statistics.clear();
+
+        // Timekeeping
+        AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
+        AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate());
+        long startTimestamp = TimeUtils.stamp2unix(appConfig.startDate());
+
+        List<TimedMetricsRecord> timeSeriesData = new ArrayList<>();
+
+        for (AbsoluteDate t = startDate; t.compareTo(endDate) <= 0; t = t.shiftedBy(appConfig.timeStep())) {
+
+            long timeElapsed = TimeUtils.stamp2unix(t.toString()) - startTimestamp;
+
+            // Group regions by number of satellites on sight, for this particular time step
+            Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
+
+            double[] surfaceValues = new double[satelliteList.size()];
+
+            TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
+
+            byAssetsInSight.forEach((k, aaps) -> {
+                aaps.parallelStream().forEach(accessAreaPolygon -> {
+                    surfaceValues[k - 1] = surfaceValues[k - 1] + geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates());
+                    timedMetricsRecord.accumulateMetric(k - 1, geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates()));
+                });
+
+            });
+
+            StringBuilder sb = new StringBuilder(timeElapsed + "");
+            for (double surface : surfaceValues) {
+                sb.append(",");
+                sb.append(surface);
+            }
+
+            timeSeriesData.add(timedMetricsRecord);
+            statistics.add(sb.toString());
+
+        }
+        Log.info("Ending Constellation Coverage Analysis");
+
+//        if (appConfig.saveGeographic() && appConfig.saveSnapshot()) {
+//            saveAAPsAt(roiIntersections, "snapshot_aaps_intersection_" + simulationHash, appConfig.snapshot());
+//            saveAAPsAt(roiUnions, "snapshot_aaps_union_" + simulationHash, appConfig.snapshot());
+//        }
+
+        fileUtils.saveAsCSV(statistics, "constellation_coverage_" + simulationHash);
+        fileUtils.saveAsJSON(timeSeriesData, "constellation_surface_metrics_" + simulationHash);
+
+    }
+
     private Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> mapByNOfAssets(List<AccessAreaPolygon> accessAreaPolygons, long timeElapsed) {
 
-        Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = new LinkedHashMap<>(appConfig.maxSubsetSize());
+        Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = new LinkedHashMap<>(Math.min(appConfig.maxSubsetSize(), satelliteList.size()));
         accessAreaPolygons.stream().filter(aap -> aap.getDate() == timeElapsed).forEach(aap -> {
             int nAssets = aap.getnOfGwsInSight();
             if (byAssetsInSight.containsKey(nAssets)) {
@@ -391,7 +458,7 @@ public class ConstellationCoverageComputer {
 
     private void saveAAPs(List<AccessAreaPolygon> accessAreaPolygons, String fileName) {
 
-        for (int nOfGw = 1; nOfGw <= appConfig.maxSubsetSize(); nOfGw++) {
+        for (int nOfGw = 1; nOfGw <= Math.min(appConfig.maxSubsetSize(), satelliteList.size()); nOfGw++) {
             int finalNOfGw = nOfGw;
 
             try {

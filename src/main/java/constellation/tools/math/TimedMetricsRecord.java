@@ -1,5 +1,7 @@
 package constellation.tools.math;
 
+import java.util.Arrays;
+
 public class TimedMetricsRecord {
 
     long time;
@@ -8,10 +10,15 @@ public class TimedMetricsRecord {
     public TimedMetricsRecord(long time, int metricsCount) {
         this.time = time;
         metrics = new double[metricsCount];
+        Arrays.fill(metrics, 0.0);
     }
 
-    public void addMetric(int assetID, double surfaceValue) {
-        metrics[assetID] = surfaceValue;
+    public void addMetric(int index, double value) {
+        metrics[index] = value;
+    }
+
+    public void accumulateMetric(int index, double value) {
+        metrics[index] += value;
     }
 
     public void scale(double factor) {
