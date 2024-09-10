@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * Dynamic Constellation Coverage Computer (D3CO)
@@ -405,16 +406,13 @@ public class ConstellationCoverageComputer {
             Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
 
             double[] surfaceValues = new double[satelliteList.size()];
-
+            Arrays.fill(surfaceValues, 0.0);
             TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
 
-            byAssetsInSight.forEach((k, aaps) -> {
-                aaps.parallelStream().forEach(accessAreaPolygon -> {
-                    surfaceValues[k - 1] = surfaceValues[k - 1] + geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates());
-                    timedMetricsRecord.accumulateMetric(k - 1, geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates()));
-                });
-
-            });
+            byAssetsInSight.forEach((k, aaps) -> aaps.parallelStream().forEach(accessAreaPolygon -> {
+                surfaceValues[k - 1] += geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates());
+                timedMetricsRecord.accumulateMetric(k - 1, geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates()));
+            }));
 
             StringBuilder sb = new StringBuilder(timeElapsed + "");
             for (double surface : surfaceValues) {
@@ -422,6 +420,7 @@ public class ConstellationCoverageComputer {
                 sb.append(surface);
             }
 
+            timedMetricsRecord.scale(10.0E-6); // To m2
             timeSeriesData.add(timedMetricsRecord);
             statistics.add(sb.toString());
 
@@ -433,7 +432,8 @@ public class ConstellationCoverageComputer {
 //            saveAAPsAt(roiUnions, "snapshot_aaps_union_" + simulationHash, appConfig.snapshot());
 //        }
 
-        fileUtils.saveAsCSV(statistics, "constellation_coverage_" + simulationHash);
+        // fileUtils.saveAsCSV(statistics, "constellation_coverage_" + simulationHash);
+        fileUtils.saveAsCSV(timeSeriesData.stream().map(TimedMetricsRecord::toString).toList(), "constellation_coverage_" + simulationHash);
         fileUtils.saveAsJSON(timeSeriesData, "constellation_surface_metrics_" + simulationHash);
 
     }
