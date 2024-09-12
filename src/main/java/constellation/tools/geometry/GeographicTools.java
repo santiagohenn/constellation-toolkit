@@ -208,7 +208,7 @@ public class GeographicTools {
      * @param segments  the amount of segments for the polygon
      * @return a List of double[] containing the polygon (counter clock-wise direction)
      **/
-    public static List<double[]> computeSphericalCap(double lambdaMax, double centerLat, double centerLon, double segments) {
+    public static List<double[]> computeSphericalCap(double centerLat, double centerLon, double lambdaMax, double segments) {
 
         List<double[]> coordinates = new ArrayList<>();
 
