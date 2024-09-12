@@ -409,7 +409,7 @@ public class ConstellationCoverageComputer {
             Arrays.fill(surfaceValues, 0.0);
             TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
 
-            byAssetsInSight.forEach((k, aaps) -> aaps.parallelStream().forEach(accessAreaPolygon -> {
+            byAssetsInSight.forEach((k, aaps) -> aaps.forEach(accessAreaPolygon -> {
                 surfaceValues[k - 1] += geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates());
                 timedMetricsRecord.accumulateMetric(k - 1, geographicTools.computeNonEuclideanSurface(accessAreaPolygon.getGeoCoordinates()));
             }));

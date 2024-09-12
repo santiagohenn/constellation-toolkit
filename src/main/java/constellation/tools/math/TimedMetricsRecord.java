@@ -37,7 +37,7 @@ public class TimedMetricsRecord {
 
     @Override
     public String toString() {
-        return time + ", " + Arrays.toString(metrics);
+        return time + ", " + Arrays.toString(metrics).replace("[","").replace("]","");
     }
 
 }

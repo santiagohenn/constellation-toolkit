@@ -142,7 +142,7 @@ public class GeographicTools {
         PolygonArea polygonArea = new PolygonArea(Geodesic.WGS84, false);
 
         for (double[] pair : pairList) {
-            polygonArea.AddPoint(pair[0], pair[1]);
+            polygonArea.AddPoint(GeoMath.AngNormalize(pair[0]), GeoMath.AngNormalize(pair[1]));
         }
 
         PolygonResult result = polygonArea.Compute();
