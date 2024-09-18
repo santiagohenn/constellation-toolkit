@@ -17,6 +17,10 @@ public class FileUtils {
     public static final String CSV_EXTENSION = ".csv";
     private final String outputPath;
 
+    /**
+     * Initializes FileUtils with an output path
+     * @param outputPath the directory's path
+     */
     public FileUtils(String outputPath) {
         if (!outputPath.endsWith("/")) {
             outputPath = outputPath + "/";
@@ -37,10 +41,11 @@ public class FileUtils {
 
     /**
      * Saves a String List to a new file, each entry as a line
+     *
      * @param entryList the String to be stored
-     * @param name the name to the file
+     * @param name      the name to the file
      */
-    public boolean saveAsCSV(List<String> entryList, String name) {
+    public void saveAsCSV(List<String> entryList, String name) {
 
         try (FileWriter writer = new FileWriter(outputPath + name + CSV_EXTENSION)) {
             for (String entry : entryList) {
@@ -48,9 +53,7 @@ public class FileUtils {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            return false;
         }
-        return true;
     }
 
     /**

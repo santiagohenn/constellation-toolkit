@@ -41,6 +41,8 @@ public class ConstellationCoverageComputer {
     private List<Map<Long, Ephemeris>> constellation;
     private List<double[]> nonEuclideanROI;
 
+    private List<TimedMetricsRecord> constellationCoverageTimeSeries;
+
     private static AppConfig appConfig;
     private Simulation simulation;
     private FileUtils fileUtils;
@@ -257,7 +259,7 @@ public class ConstellationCoverageComputer {
 
         List<AccessAreaPolygon> roiIntersections = new ArrayList<>();
         List<AccessAreaPolygon> roiUnions = new ArrayList<>();
-        List<TimedMetricsRecord> timeSeriesData = new ArrayList<>();
+        this.constellationCoverageTimeSeries = new ArrayList<>();
         AtomicInteger changes = new AtomicInteger();
 
         Log.info("Analyzing ROI coverage");
@@ -317,7 +319,7 @@ public class ConstellationCoverageComputer {
                         accessAreaPolygon.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
                         Log.error("### WITH ###");
                         nonEuclideanROI.forEach(c -> Log.error(c[0] + "," + c[1]));
-                        e.printStackTrace();
+                        Log.error(e.getLocalizedMessage());
                     }
 
                     if (eIntersection.size() >= 3) {
@@ -355,7 +357,7 @@ public class ConstellationCoverageComputer {
                     } catch (NullPointerException e) {
                         Log.error("Regions empty?: " + unionQueue.isEmpty());
                         Log.error("Regions size?: " + unionQueue.size());
-                        e.printStackTrace();
+                        Log.error(e.getLocalizedMessage());
                     }
                 }
             });
@@ -369,7 +371,7 @@ public class ConstellationCoverageComputer {
             }
 
             timedMetricsRecord.scale(1 / roiSurface);
-            timeSeriesData.add(timedMetricsRecord);
+            constellationCoverageTimeSeries.add(timedMetricsRecord);
             statistics.add(sb.toString());
 
         }
@@ -383,7 +385,7 @@ public class ConstellationCoverageComputer {
         }
 
         fileUtils.saveAsCSV(statistics, "coverage_" + simulationHash);
-        fileUtils.saveAsJSON(timeSeriesData, "surface_metrics_" + simulationHash);
+        fileUtils.saveAsJSON(constellationCoverageTimeSeries, "surface_metrics_" + simulationHash);
 
     }
 
@@ -517,7 +519,7 @@ public class ConstellationCoverageComputer {
             } catch (NullPointerException e) {
                 Log.error("time: " + timeElapsed);
                 Log.error("sat id: " + satellite.getId());
-                e.printStackTrace();
+                Log.error(e.getLocalizedMessage());
             }
 
             double lambdaMax = geographicTools.getLambdaMax(x, y, z, appConfig.visibilityThreshold());
@@ -604,6 +606,10 @@ public class ConstellationCoverageComputer {
 
     public String getSimulationHash() {
         return this.simulationHash;
+    }
+
+    public List<TimedMetricsRecord> getConstellationCoverageTimeSeries() {
+        return this.constellationCoverageTimeSeries;
     }
 
 }
