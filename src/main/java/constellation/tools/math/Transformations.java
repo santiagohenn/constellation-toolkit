@@ -61,8 +61,7 @@ public class Transformations {
      **/
     public static double[] toStereo(double latRads, double lonRads, double referenceLatRads, double referenceLonRads) {
 
-        double localR = RADIUS; // getLocalRadiusKm(Math.toRadians(lat));
-        double k = (2 * localR) / (1 + Math.sin(referenceLatRads) * Math.sin(latRads) +
+        double k = (2 * RADIUS) / (1 + Math.sin(referenceLatRads) * Math.sin(latRads) +
                 Math.cos(referenceLatRads) * Math.cos(latRads) * Math.cos(lonRads - referenceLonRads));
 
         double xStereo = k * Math.cos(latRads) * Math.sin(lonRads - referenceLonRads);

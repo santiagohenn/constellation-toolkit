@@ -29,12 +29,12 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 /**
- * Dynamic Constellation Coverage Computer (D3CO)
+ * Region Access Computer uses the same set of tools as the ConstellationCoverageComputer, but deals with the access metrics
+ * for the satellite itself, as an object, rather than its FOV.
  **/
-public class ConstellationCoverageComputer {
+public class RegionAccessComputer {
 
     private List<Satellite> satelliteList;
     private final List<String> statistics = new ArrayList<>();
@@ -60,7 +60,7 @@ public class ConstellationCoverageComputer {
     /**
      * Default constructor
      **/
-    public ConstellationCoverageComputer() {
+    public RegionAccessComputer() {
         loadConfigurations();
         satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
@@ -68,7 +68,7 @@ public class ConstellationCoverageComputer {
     /**
      * Accepts configurations (either config file or JSON)
      **/
-    public ConstellationCoverageComputer(String configurations) {
+    public RegionAccessComputer(String configurations) {
         loadConfigurations(configurations);
         satelliteList = Utils.satellitesFromFile(appConfig.satellitesFile());
     }
@@ -98,14 +98,14 @@ public class ConstellationCoverageComputer {
             System.exit(100);
         } catch (Exception e) {
             Log.error("Error trying to instance the simulation. Exiting. ");
-            e.printStackTrace();
+            Log.error(e.getLocalizedMessage());
             System.exit(101);
         }
 
         geographicTools = new GeographicTools();
     }
 
-    public void run() {
+    public void computeROIAccess() {
 
         setSimulationHash(ConstellationHash.hash2(satelliteList));
         Log.info("Simulation hash: " + this.simulationHash);
@@ -115,52 +115,50 @@ public class ConstellationCoverageComputer {
             constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
         }
 
-        List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = propagateAccessAreaPolygons();
-        analyzeROICoverage(nonEuclideanAccessAreaPolygons);
+        List<TimedMetricsRecord> roiAccessStatistics = propagateOrbitsAndObtainROIIntrusion();
+
+//        analyzeConstellationCoverage(nonEuclideanAccessAreaPolygons);
 
     }
 
-    public void computeEarthCoverage() {
+    // TODO: Now, I'm computing everything for time's sake and not wanting to mess up anything. Access Area Polygons include
+    // the SSP due to Santi in the past actions.
+    private List<TimedMetricsRecord> propagateOrbitsAndObtainROIIntrusion() {
 
-        setSimulationHash(ConstellationHash.hash2(satelliteList));
-        Log.info("Simulation hash: " + this.simulationHash);
-
-        if (!appConfig.propagateInternally()) {
-            Log.debug("Reading ephemeris from directory: " + appConfig.positionsPath());
-            constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
-        }
-
-        List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = propagateAccessAreaPolygons();
-        analyzeConstellationCoverage(nonEuclideanAccessAreaPolygons);
-
-    }
-
-    private List<AccessAreaPolygon> propagateAccessAreaPolygons() {
-
-        AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
         AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate(), DataContext.getDefault().getTimeScales().getUTC());
 
-        // We compute a Utility "List of Lists", containing all possible overlapping combinations between regions.
-        Combination comb = new Combination(satelliteList.size(), Math.min(appConfig.maxSubsetSize(), satelliteList.size()));
-        final List<List<Integer>> combinationsList = comb.computeCombinations();
+        List<TimedMetricsRecord> roiAccessStatistics = new ArrayList<>();
 
-        List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons = new ArrayList<>();
-        List<AccessAreaPolygon> euclideanAccessAreaPolygons = new ArrayList<>();
-
-        for (AbsoluteDate date = startDate; date.compareTo(endDate) <= 0; date = date.shiftedBy(appConfig.timeStep())) {
+        for (AbsoluteDate date = Utils.stamp2AD(appConfig.startDate()); date.compareTo(endDate) <= 0; date = date.shiftedBy(appConfig.timeStep())) {
 
             long timeElapsed = TimeUtils.stamp2unix(date.toString()) - TimeUtils.stamp2unix(appConfig.startDate());
 
             // Obtain the starting non-euclidean FOVs
             List<AccessRegion> nonEuclideanAccessRegions = computeAccessRegionsAt(satelliteList, simulation, date, timeElapsed);
-            computeIntersections(combinationsList, nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons, timeElapsed, nonEuclideanAccessRegions);
-            Log.debug("Performed: " + polyOperationsPerformedCount + " - Avoided: " + avoidedDueToNotIntersectingCount + " - Escaped: " + polyOperationsThatResultedInEmptyIntersection);
+
+            // Check satellites within the ROI
+            computeSatellitesWithinROI(roiAccessStatistics, nonEuclideanAccessRegions, timeElapsed);
 
         }
 
-        writePolygonsToFile(nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons);
+        // writePolygonsToFile(nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons);
 
-        return nonEuclideanAccessAreaPolygons;
+        return roiAccessStatistics;
+    }
+
+    private void computeSatellitesWithinROI(List<TimedMetricsRecord> roiAccessStatistics, List<AccessRegion> nonEuclideanAccessRegions, long timestamp) {
+
+        TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timestamp, satelliteList.size());
+
+        List<double[]> euclideanRoi = Transformations.toEuclideanPlane(nonEuclideanROI, 0.0, 0.0);
+        for (AccessRegion region : nonEuclideanAccessRegions) {
+            double[] euclideanSSP = Transformations.toStereo(Math.toRadians(region.getSspLat()), Math.toRadians(region.getSspLon()), 0.0, 0.0);
+            boolean isTheSatelliteWithinTheROI = PolygonOperator.pointInPolygon(euclideanRoi, euclideanSSP);
+            timedMetricsRecord.addMetric(region.getSatId(), isTheSatelliteWithinTheROI ? 1 : 0);
+        }
+
+        roiAccessStatistics.add(timedMetricsRecord);
+
     }
 
     private void writePolygonsToFile(List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons, List<AccessAreaPolygon> euclideanAccessAreaPolygons) {
@@ -210,6 +208,8 @@ public class ConstellationCoverageComputer {
 
                 // Obtain access polygon
                 Polygon intersection = polygonOperator.polyIntersect(intersectionQueue);
+
+
                 if (!intersection.getRegions().isEmpty() && intersection.getRegions().get(0).size() > 2) {
                     nonEuclideanCoordinates = Transformations.toNonEuclideanPlane(intersection.getRegions().get(0),
                             referenceLat, referenceLon);
