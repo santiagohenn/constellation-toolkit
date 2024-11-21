@@ -116,6 +116,7 @@ public class RegionAccessComputer {
         }
 
         List<TimedMetricsRecord> roiAccessStatistics = propagateOrbitsAndObtainROIIntrusion();
+        fileUtils.saveAsJSON(roiAccessStatistics, "roi_access_metrics_" + simulationHash);
 
 //        analyzeConstellationCoverage(nonEuclideanAccessAreaPolygons);
 
