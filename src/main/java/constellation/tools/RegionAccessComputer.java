@@ -118,7 +118,20 @@ public class RegionAccessComputer {
         List<TimedMetricsRecord> roiAccessStatistics = propagateOrbitsAndObtainROIIntrusion();
         fileUtils.saveAsJSON(roiAccessStatistics, "roi_access_metrics_" + simulationHash);
 
-//        analyzeConstellationCoverage(nonEuclideanAccessAreaPolygons);
+    }
+
+    public void computeROMetrics() {
+
+        setSimulationHash(ConstellationHash.hash2(satelliteList));
+        Log.info("Simulation hash: " + this.simulationHash);
+
+        if (!appConfig.propagateInternally()) {
+            Log.debug("Reading ephemeris from directory: " + appConfig.positionsPath());
+            constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
+        }
+
+        List<TimedMetricsRecord> roiAccessStatistics = propagateOrbitsAndObtainROIMetrics();
+        fileUtils.saveAsJSON(roiAccessStatistics, "roi_access_metrics_" + simulationHash);
 
     }
 
@@ -142,8 +155,6 @@ public class RegionAccessComputer {
 
         }
 
-        // writePolygonsToFile(nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons);
-
         return roiAccessStatistics;
     }
 
@@ -164,8 +175,6 @@ public class RegionAccessComputer {
             computeTrappedParticleEstimation(roiAccessStatistics, nonEuclideanAccessRegions, timeElapsed);
 
         }
-
-        // writePolygonsToFile(nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons);
 
         return roiAccessStatistics;
     }
