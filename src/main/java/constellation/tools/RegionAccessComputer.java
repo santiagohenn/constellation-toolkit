@@ -198,6 +198,7 @@ public class RegionAccessComputer {
             }
             timedMetricsRecord.addMetric(region.getSatId(), tpoValue);
         }
+        roiAccessStatistics.add(timedMetricsRecord);
     }
 
     private void computeSatellitesWithinROI(List<TimedMetricsRecord> roiAccessStatistics, List<AccessRegion> nonEuclideanAccessRegions, long timestamp) {
