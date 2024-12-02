@@ -147,6 +147,50 @@ public class RegionAccessComputer {
         return roiAccessStatistics;
     }
 
+    private List<TimedMetricsRecord> propagateOrbitsAndObtainROIMetrics() {
+
+        AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate(), DataContext.getDefault().getTimeScales().getUTC());
+
+        List<TimedMetricsRecord> roiAccessStatistics = new ArrayList<>();
+
+        for (AbsoluteDate date = Utils.stamp2AD(appConfig.startDate()); date.compareTo(endDate) <= 0; date = date.shiftedBy(appConfig.timeStep())) {
+
+            long timeElapsed = TimeUtils.stamp2unix(date.toString()) - TimeUtils.stamp2unix(appConfig.startDate());
+
+            // Obtain the starting non-euclidean FOVs
+            List<AccessRegion> nonEuclideanAccessRegions = computeAccessRegionsAt(satelliteList, simulation, date, timeElapsed);
+
+            // Check satellites within the ROI
+            computeTrappedParticleEstimation(roiAccessStatistics, nonEuclideanAccessRegions, timeElapsed);
+
+        }
+
+        // writePolygonsToFile(nonEuclideanAccessAreaPolygons, euclideanAccessAreaPolygons);
+
+        return roiAccessStatistics;
+    }
+
+    private void computeTrappedParticleEstimation(List<TimedMetricsRecord> roiAccessStatistics, List<AccessRegion> nonEuclideanAccessRegions, long timestamp) {
+        TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timestamp, satelliteList.size());
+        for (AccessRegion region : nonEuclideanAccessRegions) {
+            double[] geoCoordinates = {region.getSspLat(), region.getSspLon()};
+            // Get the TPO value
+            double euclideanDistance = Double.MAX_VALUE;
+            double tpoValue = 0;
+            for (double[] coordinate : nonEuclideanROI) {
+                double currentEuclideanDistance = Math.sqrt(Math.pow(coordinate[0] - geoCoordinates[0],2)
+                        + Math.pow(coordinate[1] - geoCoordinates[1],2));
+                if (currentEuclideanDistance < euclideanDistance) {
+                    tpoValue = coordinate[2];
+                    euclideanDistance = currentEuclideanDistance;
+                }
+                if (currentEuclideanDistance < 2) // less than 2 degrees is fine
+                    break;
+            }
+            timedMetricsRecord.addMetric(region.getSatId(), tpoValue);
+        }
+    }
+
     private void computeSatellitesWithinROI(List<TimedMetricsRecord> roiAccessStatistics, List<AccessRegion> nonEuclideanAccessRegions, long timestamp) {
 
         TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timestamp, satelliteList.size());
