@@ -67,6 +67,7 @@ public class OblateAccessRegion {
      * @param segments the amount of segments for a half-cone of visibility
      * @return a List of double[] containing the polygons coordinates in degrees
      **/
+    @SuppressWarnings("unused")
     public static List<double[]> drawConic(double x, double y, double z, double eta, double epsilon, double tol,
                                            int segments, int type) {
 
@@ -284,6 +285,7 @@ public class OblateAccessRegion {
     }
 
 
+    @SuppressWarnings("unused")
     private static List<double[]> computeHalfAperture(double a_tilde, double b_tilde, double alpha_SC, double etaDeg,
                                                       double eta_hor_1, double eta_hor_2, Vector3D r_line_local) {
 

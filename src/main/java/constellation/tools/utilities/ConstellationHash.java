@@ -4,12 +4,10 @@ import org.jline.utils.Log;
 import satellite.tools.assets.entities.Satellite;
 import satellite.tools.structures.OrbitalElements;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -64,7 +62,7 @@ public class ConstellationHash {
         for (int i = 0; i < 6; i++) {
             elements_concatenated.add(new StringBuilder());
         }
-        double k = 1;
+
         for (Satellite satellite : constellation) {
             OrbitalElements elements = satellite.getElements();
             elements_concatenated.get(0).append((int) (elements.getSemiMajorAxis()));

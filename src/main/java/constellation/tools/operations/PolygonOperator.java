@@ -7,7 +7,6 @@ import satellite.tools.utils.Log;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.menecats.polybool.helpers.PolyBoolHelper.epsilon;
 import static com.menecats.polybool.helpers.PolyBoolHelper.polygon;

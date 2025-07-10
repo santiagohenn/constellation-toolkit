@@ -91,7 +91,7 @@ public class RegionAccessComputer {
             polygonOperator = new PolygonOperator(appConfig.polygonEpsilon());
 
             if (appConfig.useRoiFile()) {
-                nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
+                nonEuclideanROI = FileUtils.file2DoubleList(appConfig.roiPath());
             }
         } catch (ConfigurationException e) {
             Log.error("Error trying to load configurations. Exiting. " + e.getMessage());
@@ -216,6 +216,7 @@ public class RegionAccessComputer {
 
     }
 
+    @SuppressWarnings("unused")
     private void writePolygonsToFile(List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons, List<AccessAreaPolygon> euclideanAccessAreaPolygons) {
 
         if (appConfig.saveGeographic())
@@ -232,6 +233,7 @@ public class RegionAccessComputer {
 
     }
 
+    @SuppressWarnings("unused")
     private void computeIntersections(List<List<Integer>> combinationsList, List<AccessAreaPolygon> nonEuclideanAccessAreaPolygons, List<AccessAreaPolygon> euclideanAccessAreaPolygons, long timeElapsed, List<AccessRegion> nonEuclideanAccessRegions) {
 
         for (List<Integer> combination : combinationsList) {

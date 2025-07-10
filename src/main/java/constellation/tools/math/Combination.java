@@ -1,7 +1,6 @@
 package constellation.tools.math;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Combination {
