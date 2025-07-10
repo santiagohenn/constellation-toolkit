@@ -6,7 +6,7 @@ public class Example {
 
     public static void main(String[] args) {
         
-        String configurationsPath = "./example.properties";
+        String configurationsPath = "./example/example.properties";
         ConstellationCoverageComputer app = new ConstellationCoverageComputer(configurationsPath);
         app.run();
 
