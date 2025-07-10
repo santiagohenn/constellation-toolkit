@@ -34,6 +34,7 @@ public class ConstellationHash {
         }
     }
 
+    @Deprecated
     public static String hash(List<Satellite> constellation) {
 
         StringBuilder sb = new StringBuilder();
@@ -59,7 +60,6 @@ public class ConstellationHash {
     public static String hash2(List<Satellite> constellation) {
 
         StringBuilder sb = new StringBuilder();
-        // int[] elementsSum = new int[6];
         List<StringBuilder> elements_concatenated = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             elements_concatenated.add(new StringBuilder());

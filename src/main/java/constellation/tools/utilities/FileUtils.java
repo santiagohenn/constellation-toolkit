@@ -98,7 +98,6 @@ public class FileUtils {
             var file = new File(path + "S" + nSat + "" + FileUtils.CSV_EXTENSION);
             try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
                 String line;
-                int id = 0;
                 while ((line = br.readLine()) != null) {
                     if (!line.startsWith("//") && line.length() > 0) {
                         var data = line.split(",");
@@ -129,7 +128,7 @@ public class FileUtils {
      *
      * @return List<Pair>
      */
-    public List<double[]> file2DoubleList(String fileName) {
+    public static List<double[]> file2DoubleList(String fileName) {
 
         fileName = fileName.replace("//", "/");
         fileName = fileName.replace("\\\\", "\\");

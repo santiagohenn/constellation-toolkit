@@ -29,7 +29,6 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 /**
  * Dynamic Constellation Coverage Computer (D3CO)
@@ -91,7 +90,7 @@ public class ConstellationCoverageComputer {
             polygonOperator = new PolygonOperator(appConfig.polygonEpsilon());
 
             if (appConfig.useRoiFile()) {
-                nonEuclideanROI = fileUtils.file2DoubleList(appConfig.roiPath());
+                nonEuclideanROI = FileUtils.file2DoubleList(appConfig.roiPath());
             }
         } catch (ConfigurationException e) {
             Log.error("Error trying to load configurations. Exiting. " + e.getMessage());
