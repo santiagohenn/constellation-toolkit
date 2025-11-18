@@ -110,8 +110,8 @@ public class FileUtils {
                 firstLine = false;
                 
                 var data = line.split(",");
-                // TODO: we should make ephemeris time a double throughout the codebase
-                long time = (long) Double.parseDouble(data[0]);
+                // TODO: we should make ephemeris time a double throughout the codebase. And use seconds. For gods sake.
+                long time = (long) (Double.parseDouble(data[0]) * 1000.0); // Convert to milliseconds
                 double x = round(Double.parseDouble(data[1]));
                 double y = round(Double.parseDouble(data[2]));
                 double z = round(Double.parseDouble(data[3]));

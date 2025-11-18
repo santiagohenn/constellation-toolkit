@@ -110,7 +110,7 @@ public class ConstellationCoverageComputer {
         Log.info("Simulation hash: " + this.simulationHash);
 
         if (!appConfig.propagateInternally()) {
-            Log.debug("Reading ephemeris from directory: " + appConfig.positionsPath());
+            Log.info("Reading ephemeris from directory: " + appConfig.positionsPath());
             constellation = fileUtils.positionsFromPath(appConfig.positionsPath(), satelliteList.size());
         }
 
