@@ -97,26 +97,36 @@ public class FileUtils {
             Map<Long, Ephemeris> positions = new LinkedHashMap<>();
             var file = new File(path + "S" + nSat + "" + FileUtils.CSV_EXTENSION);
             try (var fr = new FileReader(file); var br = new BufferedReader(fr)) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    if (!line.startsWith("//") && line.length() > 0) {
-                        var data = line.split(",");
-                        long time = Long.parseLong(data[0]);
-                        double x = round(Double.parseDouble(data[1]));
-                        double y = round(Double.parseDouble(data[2]));
-                        double z = round(Double.parseDouble(data[3]));
-                        Ephemeris eph = new Ephemeris(time, x, y, z);
-                        double[] ssp = OblateAccessRegion.ecef2llaD(x, y, z);
-                        eph.setSSP(ssp[0], ssp[1], ssp[2]);
-                        positions.put(time, eph);
-                    }
+            String line;
+            boolean firstLine = true;
+            while ((line = br.readLine()) != null) {
+                if (!line.startsWith("//") && line.length() > 0) {
+                    
+                // Skip first line if it contains quotes (header)
+                if (firstLine && line.contains("\"")) {
+                    firstLine = false;
+                    continue;
                 }
+                firstLine = false;
+                
+                var data = line.split(",");
+                // TODO: we should make ephemeris time a double throughout the codebase
+                long time = (long) Double.parseDouble(data[0]);
+                double x = round(Double.parseDouble(data[1]));
+                double y = round(Double.parseDouble(data[2]));
+                double z = round(Double.parseDouble(data[3]));
+                Ephemeris eph = new Ephemeris(time, x, y, z);
+                double[] ssp = OblateAccessRegion.ecef2llaD(x, y, z);
+                eph.setSSP(ssp[0], ssp[1], ssp[2]);
+                positions.put(time, eph);
+                }
+            }
             } catch (FileNotFoundException e) {
-                Log.warn("Unable to find file: " + file);
-                e.printStackTrace();
+            Log.warn("Unable to find file: " + file);
+            e.printStackTrace();
             } catch (IOException e) {
-                Log.error("IOException: " + file);
-                e.printStackTrace();
+            Log.error("IOException: " + file);
+            e.printStackTrace();
             }
             constellation.add(positions);
         }
