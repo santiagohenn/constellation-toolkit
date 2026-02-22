@@ -251,13 +251,14 @@ public class ConstellationCoverageComputer {
         double roiSurface = geographicTools.computeNonEuclideanSurface(nonEuclideanROI);
         Log.info("ROI Surface: " + roiSurface);
 
-        // Timekeeping
         AbsoluteDate startDate = Utils.stamp2AD(appConfig.startDate());
         AbsoluteDate endDate = Utils.stamp2AD(appConfig.endDate());
         long startTimestamp = TimeUtils.stamp2unix(appConfig.startDate());
 
-        List<AccessAreaPolygon> roiIntersections = new ArrayList<>();
-        List<AccessAreaPolygon> roiUnions = new ArrayList<>();
+        // FIX: Use CopyOnWriteArrayList — these lists are written from the inner stream
+        // and read later for snapshot saving. Plain ArrayList is not safe here.
+        List<AccessAreaPolygon> roiIntersections = new CopyOnWriteArrayList<>();
+        List<AccessAreaPolygon> roiUnions = new CopyOnWriteArrayList<>();
         this.constellationCoverageTimeSeries = new ArrayList<>();
         AtomicInteger changes = new AtomicInteger();
 
@@ -266,28 +267,41 @@ public class ConstellationCoverageComputer {
 
             long timeElapsed = TimeUtils.stamp2unix(t.toString()) - startTimestamp;
 
-            // Group regions by number of satellites on sight, for this particular time step
             Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
 
+            // FIX: Guard against missing k=1 entry. If no single-satellite AAP exists at this
+            // timestep (all satellites below horizon), skip rather than NPE on .get(1).get(0).
+            if (!byAssetsInSight.containsKey(1) || byAssetsInSight.get(1).isEmpty()) {
+                Log.warn("No single-satellite AAPs at t=" + timeElapsed + "; skipping timestep.");
+                constellationCoverageTimeSeries.add(new TimedMetricsRecord(timeElapsed, satelliteList.size()));
+                statistics.add(timeElapsed + ",".repeat(satelliteList.size()));
+                continue;
+            }
+
+            // FIX: surfaceValues is written from the byAssetsInSight.forEach lambda (sequential),
+            // so a plain double[] is safe as long as the inner stream is also sequential (see below).
             double[] surfaceValues = new double[satelliteList.size()];
 
-            // Starting euclidean ROI
             AtomicReference<Double> roiReferenceLat = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLat());
             AtomicReference<Double> roiReferenceLon = new AtomicReference<>(byAssetsInSight.get(1).get(0).getReferenceLon());
-            AtomicReference<List<double[]>> euclideanROI = new AtomicReference<>(Transformations.toEuclideanPlane(nonEuclideanROI, roiReferenceLat.get(), roiReferenceLon.get()));
+            AtomicReference<List<double[]>> euclideanROI = new AtomicReference<>(
+                    Transformations.toEuclideanPlane(nonEuclideanROI, roiReferenceLat.get(), roiReferenceLon.get()));
 
             TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
 
-            // Perform intersection of AAPs with the ROI and surface area values calculation
-            // For each number of assets
-
             byAssetsInSight.forEach((k, aaps) -> {
 
-                // TODO: Generalize for any ROI
+                // FIX: Validate k is within array bounds before using as index.
+                // k comes from getnOfGwsInSight() which reflects combination.size(); a config
+                // mismatch (maxSubsetSize > satelliteList.size()) can produce k > array length.
+                if (k < 1 || k > satelliteList.size()) {
+                    Log.warn("Unexpected k=" + k + " (satelliteList.size()=" + satelliteList.size() + "); skipping group.");
+                    return;
+                }
+
                 double referenceLat = aaps.get(0).getReferenceLat();
                 double referenceLon = aaps.get(0).getReferenceLon();
 
-                // Only if the reference changes, re-project
                 if (referenceLat != roiReferenceLat.get() || referenceLon != roiReferenceLon.get()) {
                     changes.getAndIncrement();
                     roiReferenceLat.set(referenceLat);
@@ -295,88 +309,116 @@ public class ConstellationCoverageComputer {
                     euclideanROI.set(Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon));
                 }
 
+                // FIX: Changed to plain ArrayList — safe because the stream below is sequential.
+                // The original parallelStream() caused concurrent ArrayList.add() calls, which
+                // corrupts internal state and throws ArrayIndexOutOfBoundsException.
                 List<List<double[]>> unionQueue = new ArrayList<>();
 
-                // For each AAP with this number of assets in sight
-                aaps.parallelStream().forEach(accessAreaPolygon -> {
-
-                    List<double[]> eIntersection = new ArrayList<>();
+                // FIX: Changed parallelStream() → stream() (sequential).
+                // parallelStream() caused concurrent mutation of: unionQueue (ArrayList),
+                // surfaceValues (double[]), timedMetricsRecord, and roiIntersections (ArrayList).
+                // None of these are safe for concurrent writes.
+                aaps.stream().forEach(accessAreaPolygon -> {
 
                     try {
-                        List<List<double[]>> polygonAndROI = Arrays.asList(euclideanROI.get(),
-                                Transformations.toEuclideanPlane(accessAreaPolygon.getGeoCoordinates(),
-                                        referenceLat, referenceLon));
+                        List<List<double[]>> polygonAndROI = Arrays.asList(
+                                euclideanROI.get(),
+                                Transformations.toEuclideanPlane(accessAreaPolygon.getGeoCoordinates(), referenceLat, referenceLon)
+                        );
                         Polygon intersection = polygonOperator.polyIntersect(polygonAndROI);
-                        eIntersection = intersection.getRegions().isEmpty() ? eIntersection : intersection.getRegions().get(0);
 
-                        if (intersection.getRegions().size() > 1) {
-                            Log.warn("More than 1 intersection!!!");
+                        // FIX: Multipart intersection support — previously only .get(0) was used,
+                        // silently dropping any additional disjoint regions. Now all parts are processed.
+                        List<List<double[]>> allRegions = intersection.getRegions();
+
+                        if (allRegions.isEmpty()) {
+                            // No intersection with ROI — nothing to record for this AAP.
+                            return;
+                        }
+
+                        if (allRegions.size() > 1) {
+                            Log.debug("Multipart intersection: " + allRegions.size() + " parts at k=" + k + ", t=" + timeElapsed);
+                        }
+
+                        for (List<double[]> eIntersectionPart : allRegions) {
+
+                            // FIX: Skip degenerate regions — fewer than 3 points cannot form a polygon.
+                            if (eIntersectionPart.size() < 3) {
+                                Log.warn("Intersection part has < 3 points; skipping.");
+                                continue;
+                            }
+
+                            List<double[]> neIntersectionPart = Transformations.toNonEuclideanPlane(eIntersectionPart, referenceLat, referenceLon);
+
+                            // Per-satellite surface contribution (k=1 only)
+                            if (k == 1) {
+                                // FIX: Guard gwsInSight before indexing to avoid IndexOutOfBoundsException.
+                                List<Integer> gwsInSight = accessAreaPolygon.getGwsInSight();
+                                if (gwsInSight != null && !gwsInSight.isEmpty()) {
+                                    timedMetricsRecord.addMetric(gwsInSight.get(0),
+                                            geographicTools.computeNonEuclideanSurface(neIntersectionPart));
+                                }
+                            }
+
+                            // Each disjoint part is queued individually for the union pass
+                            unionQueue.add(eIntersectionPart);
+
+                            AccessAreaPolygon intersectionAAP = new AccessAreaPolygon(
+                                    timeElapsed, k, accessAreaPolygon.getGwsInSight(), neIntersectionPart,
+                                    neIntersectionPart.stream().map(pair -> pair[0]).toList(),
+                                    neIntersectionPart.stream().map(pair -> pair[1]).toList());
+                            roiIntersections.add(intersectionAAP);
                         }
 
                     } catch (RuntimeException e) {
-                        Log.error("Error trying to intersect the following polygon: ");
+                        Log.error("Error intersecting polygon at k=" + k + ", t=" + timeElapsed + ": " + e.getMessage());
                         accessAreaPolygon.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
-                        Log.error("### WITH ###");
+                        Log.error("### WITH ROI ###");
                         nonEuclideanROI.forEach(c -> Log.error(c[0] + "," + c[1]));
-                        Log.error(e.getLocalizedMessage());
                     }
-
-                    if (eIntersection.size() >= 3) {
-                        unionQueue.add(eIntersection);
-                    } else if (!eIntersection.isEmpty()) {
-                        Log.warn("Intersection with less than 3 points");
-                    }
-
-                    List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
-
-                    // Surface for K = 1 (intersection seen by 1 GW):
-                    if (k == 1) {
-                        timedMetricsRecord.addMetric(accessAreaPolygon.getGwsInSight().get(0), geographicTools.computeNonEuclideanSurface(neIntersection));
-                    }
-
-                    AccessAreaPolygon intersectionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, accessAreaPolygon.getGwsInSight(), neIntersection,
-                            neIntersection.stream().map(pair -> pair[0]).toList(),
-                            neIntersection.stream().map(pair -> pair[1]).toList());
-                    roiIntersections.add(intersectionAccessAreaPolygon);
-
                 });
 
                 if (!unionQueue.isEmpty()) {
                     try {
                         Polygon union = polygonOperator.polyUnion(unionQueue);
-                        union = polygonOperator.polyUnion(union.getRegions());  // Second union if some polygons got clipped out
-                        union.getRegions().forEach(region -> {
-                            List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                            surfaceValues[k - 1] = surfaceValues[k - 1] + geographicTools.computeNonEuclideanSurface(neIntersection);
-                            AccessAreaPolygon unionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, null, neIntersection,
-                                    neIntersection.stream().map(pair -> pair[0]).toList(),
-                                    neIntersection.stream().map(pair -> pair[1]).toList());
-                            roiUnions.add(unionAccessAreaPolygon);
-                        });
+                        union = polygonOperator.polyUnion(union.getRegions()); // Second pass for clipped polygons
+
+                        for (List<double[]> region : union.getRegions()) {
+                            // FIX: Skip degenerate union regions.
+                            if (region.size() < 3) {
+                                Log.warn("Union region has < 3 points at k=" + k + "; skipping.");
+                                continue;
+                            }
+                            List<double[]> neUnionRegion = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
+                            // k already validated above — bounds-safe.
+                            surfaceValues[k - 1] += geographicTools.computeNonEuclideanSurface(neUnionRegion);
+
+                            AccessAreaPolygon unionAAP = new AccessAreaPolygon(
+                                    timeElapsed, k, null, neUnionRegion,
+                                    neUnionRegion.stream().map(pair -> pair[0]).toList(),
+                                    neUnionRegion.stream().map(pair -> pair[1]).toList());
+                            roiUnions.add(unionAAP);
+                        }
                     } catch (NullPointerException e) {
-                        Log.error("Regions empty?: " + unionQueue.isEmpty());
-                        Log.error("Regions size?: " + unionQueue.size());
-                        Log.error(e.getLocalizedMessage());
+                        Log.error("Union failed at k=" + k + ", t=" + timeElapsed
+                                + "; unionQueue.size()=" + unionQueue.size() + ": " + e.getMessage());
                     }
                 }
             });
 
-            StringBuilder sb = new StringBuilder(timeElapsed + "");
-
+            StringBuilder sb = new StringBuilder(String.valueOf(timeElapsed));
             for (double surface : surfaceValues) {
                 sb.append(",");
-                double percentage = (surface / roiSurface) * 100D;
-                sb.append(percentage);
+                sb.append((surface / roiSurface) * 100D);
             }
 
-            timedMetricsRecord.scale(1 / roiSurface);
+            timedMetricsRecord.scale(1.0 / roiSurface);
             constellationCoverageTimeSeries.add(timedMetricsRecord);
             statistics.add(sb.toString());
-
         }
-        Log.info("Ending ROI coverage analysis");
 
-        Log.debug("Changes: " + changes);
+        Log.info("Ending ROI coverage analysis");
+        Log.debug("Reprojection changes: " + changes);
 
         if (appConfig.saveGeographic() && appConfig.saveSnapshot()) {
             saveAAPsAt(roiIntersections, "snapshot_aaps_intersection_" + simulationHash, appConfig.snapshot());
@@ -385,7 +427,6 @@ public class ConstellationCoverageComputer {
 
         fileUtils.saveAsCSV(statistics, "coverage_" + simulationHash);
         fileUtils.saveAsJSON(constellationCoverageTimeSeries, "surface_metrics_" + simulationHash);
-
     }
 
     public void analyzeConstellationCoverage(List<AccessAreaPolygon> accessAreaPolygons) {
