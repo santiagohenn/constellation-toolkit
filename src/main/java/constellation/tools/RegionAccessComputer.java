@@ -327,6 +327,14 @@ public class RegionAccessComputer {
             // Group regions by number of satellites on sight, for this particular time step
             Map<Integer, CopyOnWriteArrayList<AccessAreaPolygon>> byAssetsInSight = mapByNOfAssets(accessAreaPolygons, timeElapsed);
 
+            // Guard against missing k=1 entry
+            if (!byAssetsInSight.containsKey(1) || byAssetsInSight.get(1).isEmpty()) {
+                Log.warn("No single-satellite AAPs at t=" + timeElapsed + "; skipping timestep.");
+                constellationCoverageTimeSeries.add(new TimedMetricsRecord(timeElapsed, satelliteList.size()));
+                statistics.add(timeElapsed + ",".repeat(satelliteList.size()));
+                continue;
+            }
+
             double[] surfaceValues = new double[satelliteList.size()];
 
             // Starting euclidean ROI
@@ -336,12 +344,13 @@ public class RegionAccessComputer {
 
             TimedMetricsRecord timedMetricsRecord = new TimedMetricsRecord(timeElapsed, satelliteList.size());
 
-            // Perform intersection of AAPs with the ROI and surface area values calculation
-            // For each number of assets
-
             byAssetsInSight.forEach((k, aaps) -> {
 
-                // TODO: Generalize for any ROI
+                if (k < 1 || k > satelliteList.size()) {
+                    Log.warn("Unexpected k=" + k + "; skipping group.");
+                    return;
+                }
+
                 double referenceLat = aaps.get(0).getReferenceLat();
                 double referenceLon = aaps.get(0).getReferenceLon();
 
@@ -353,64 +362,80 @@ public class RegionAccessComputer {
                     euclideanROI.set(Transformations.toEuclideanPlane(nonEuclideanROI, referenceLat, referenceLon));
                 }
 
+                // Sequential stream — safe for plain ArrayList and double[]
                 List<List<double[]>> unionQueue = new ArrayList<>();
 
-                // For each AAP with this number of assets in sight
-                aaps.parallelStream().forEach(accessAreaPolygon -> {
-
-                    List<double[]> eIntersection = new ArrayList<>();
+                aaps.stream().forEach(accessAreaPolygon -> {
 
                     try {
-                        List<List<double[]>> polygonAndROI = Arrays.asList(euclideanROI.get(),
-                                Transformations.toEuclideanPlane(accessAreaPolygon.getGeoCoordinates(),
-                                        referenceLat, referenceLon));
+                        List<List<double[]>> polygonAndROI = Arrays.asList(
+                                euclideanROI.get(),
+                                Transformations.toEuclideanPlane(accessAreaPolygon.getGeoCoordinates(), referenceLat, referenceLon)
+                        );
                         Polygon intersection = polygonOperator.polyIntersect(polygonAndROI);
-                        eIntersection = intersection.getRegions().isEmpty() ? eIntersection : intersection.getRegions().get(0);
 
-                        if (intersection.getRegions().size() > 1) {
-                            Log.warn("More than 1 intersection!!!");
+                        List<List<double[]>> allRegions = intersection.getRegions();
+
+                        if (allRegions.isEmpty()) {
+                            return;
+                        }
+
+                        if (allRegions.size() > 1) {
+                            Log.debug("Multipart intersection: " + allRegions.size() + " parts at k=" + k + ", t=" + timeElapsed);
+                        }
+
+                        for (List<double[]> eIntersectionPart : allRegions) {
+
+                            if (eIntersectionPart.size() < 3) {
+                                Log.warn("Intersection part has < 3 points; skipping.");
+                                continue;
+                            }
+
+                            List<double[]> neIntersectionPart = Transformations.toNonEuclideanPlane(eIntersectionPart, referenceLat, referenceLon);
+
+                            if (k == 1) {
+                                List<Integer> gwsInSight = accessAreaPolygon.getGwsInSight();
+                                if (gwsInSight != null && !gwsInSight.isEmpty()) {
+                                    timedMetricsRecord.addMetric(gwsInSight.get(0),
+                                            geographicTools.computeNonEuclideanSurface(neIntersectionPart));
+                                }
+                            }
+
+                            unionQueue.add(eIntersectionPart);
+
+                            AccessAreaPolygon intersectionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, accessAreaPolygon.getGwsInSight(), neIntersectionPart,
+                                    neIntersectionPart.stream().map(pair -> pair[0]).toList(),
+                                    neIntersectionPart.stream().map(pair -> pair[1]).toList());
+                            roiIntersections.add(intersectionAccessAreaPolygon);
                         }
 
                     } catch (RuntimeException e) {
-                        Log.error("Error trying to intersect the following polygon: ");
+                        Log.error("Error trying to intersect the following polygon at k=" + k + ", t=" + timeElapsed + ": " + e.getMessage());
                         accessAreaPolygon.getGeoCoordinates().forEach(c -> Log.error(c[0] + "," + c[1]));
                         Log.error("### WITH ###");
                         nonEuclideanROI.forEach(c -> Log.error(c[0] + "," + c[1]));
                         Log.error(e.getLocalizedMessage());
                     }
-
-                    if (eIntersection.size() >= 3) {
-                        unionQueue.add(eIntersection);
-                    } else if (!eIntersection.isEmpty()) {
-                        Log.warn("Intersection with less than 3 points");
-                    }
-
-                    List<double[]> neIntersection = Transformations.toNonEuclideanPlane(eIntersection, referenceLat, referenceLon);
-
-                    // Surface for K = 1 (intersection seen by 1 GW):
-                    if (k == 1) {
-                        timedMetricsRecord.addMetric(accessAreaPolygon.getGwsInSight().get(0), geographicTools.computeNonEuclideanSurface(neIntersection));
-                    }
-
-                    AccessAreaPolygon intersectionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, accessAreaPolygon.getGwsInSight(), neIntersection,
-                            neIntersection.stream().map(pair -> pair[0]).toList(),
-                            neIntersection.stream().map(pair -> pair[1]).toList());
-                    roiIntersections.add(intersectionAccessAreaPolygon);
-
                 });
 
                 if (!unionQueue.isEmpty()) {
                     try {
                         Polygon union = polygonOperator.polyUnion(unionQueue);
-                        union = polygonOperator.polyUnion(union.getRegions());  // Second union if some polygons got clipped out
-                        union.getRegions().forEach(region -> {
+                        union = polygonOperator.polyUnion(union.getRegions()); // Second pass for clipped polygons
+
+                        for (List<double[]> region : union.getRegions()) {
+                            if (region.size() < 3) {
+                                Log.warn("Union region has < 3 points at k=" + k + "; skipping.");
+                                continue;
+                            }
                             List<double[]> neIntersection = Transformations.toNonEuclideanPlane(region, referenceLat, referenceLon);
-                            surfaceValues[k - 1] = surfaceValues[k - 1] + geographicTools.computeNonEuclideanSurface(neIntersection);
+                            surfaceValues[k - 1] += geographicTools.computeNonEuclideanSurface(neIntersection);
+
                             AccessAreaPolygon unionAccessAreaPolygon = new AccessAreaPolygon(timeElapsed, k, null, neIntersection,
                                     neIntersection.stream().map(pair -> pair[0]).toList(),
                                     neIntersection.stream().map(pair -> pair[1]).toList());
                             roiUnions.add(unionAccessAreaPolygon);
-                        });
+                        }
                     } catch (NullPointerException e) {
                         Log.error("Regions empty?: " + unionQueue.isEmpty());
                         Log.error("Regions size?: " + unionQueue.size());
