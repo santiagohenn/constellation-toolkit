@@ -16,6 +16,32 @@ public class Transformations {
     public static final double WGS84_E2 = 0.00669437999014;
     public static final double WGS84_E = 0.081819190842613;
 
+    /**
+     * Unwraps a sequence of longitudes (in degrees) so there are no >180° jumps between
+     * consecutive points. This prevents antimeridian-crossing polygons from appearing to
+     * span the entire globe when projected to the Euclidean plane.
+     */
+    private static List<double[]> unwrapLongitudes(List<double[]> geoCoords) {
+        if (geoCoords == null || geoCoords.isEmpty()) return geoCoords;
+
+        List<double[]> unwrapped = new ArrayList<>(geoCoords.size());
+        double[] first = geoCoords.get(0);
+        unwrapped.add(new double[]{first[0], first[1]});
+
+        for (int i = 1; i < geoCoords.size(); i++) {
+            double prevLon = unwrapped.get(i - 1)[1];
+            double currLon = geoCoords.get(i)[1];
+
+            double delta = currLon - prevLon;
+            if (delta > 180.0)  delta -= 360.0;
+            if (delta < -180.0) delta += 360.0;
+
+            unwrapped.add(new double[]{geoCoords.get(i)[0], prevLon + delta});
+        }
+
+        return unwrapped;
+    }
+
     public static List<double[]> toEuclideanPlane(List<double[]> nonEuclideanPolygon, double referenceLat, double referenceLon) {
 
         List<double[]> euclideanPolygon = new ArrayList<>();
@@ -24,7 +50,10 @@ public class Transformations {
         final double referenceLatRads = Math.toRadians(referenceLat);
         final double referenceLonRads = Math.toRadians(referenceLon);
 
-        for (double[] nePair : nonEuclideanPolygon) {
+        // Unwrap longitudes before projecting so antimeridian-crossing polygons stay coherent
+        List<double[]> unwrapped = unwrapLongitudes(nonEuclideanPolygon);
+
+        for (double[] nePair : unwrapped) {
 
             double lat = Math.toRadians(nePair[0]);
             double lon = Math.toRadians(nePair[1]);

@@ -235,8 +235,12 @@ public class ConstellationCoverageComputer {
     private void recordPolygon(List<AccessAreaPolygon> accessAreaPolygonList,
                                long timeElapsed, List<Integer> combination, List<double[]> coordinates,
                                double referenceLat, double referenceLon) {
+        // FIX: Return early for degenerate/empty polygons instead of storing them.
+        // Storing empty polygons causes polyIntersect(roi, emptyPolygon) to return the
+        // full ROI in some PolygonBool library versions, falsely reporting 100% coverage.
         if (coordinates.size() <= 2) {
-            Log.debug("Less than 2 coordinates in polygon intersection");
+            Log.debug("Less than 2 coordinates in polygon intersection — skipping record.");
+            return;
         }
         accessAreaPolygonList.add(new AccessAreaPolygon(timeElapsed, combination.size(), combination, coordinates,
                 coordinates.stream().map(pair -> pair[0]).toList(),
@@ -321,9 +325,27 @@ public class ConstellationCoverageComputer {
                 aaps.stream().forEach(accessAreaPolygon -> {
 
                     try {
+                        // FIX: Skip AAPs with degenerate/empty geometry before calling polyIntersect.
+                        // An empty polygon fed into polyIntersect may be treated as the universe by
+                        // the PolygonBool library, returning the full ROI and falsely reporting 100%.
+                        List<double[]> aapGeoCoords = accessAreaPolygon.getGeoCoordinates();
+                        if (aapGeoCoords == null || aapGeoCoords.size() < 3) {
+                            Log.debug("Skipping AAP with < 3 geo coordinates at k=" + k + ", t=" + timeElapsed);
+                            return;
+                        }
+
+                        // FIX: Validate the Euclidean projection also has enough points before
+                        // passing to polyIntersect. toEuclideanPlane mirrors input length, but
+                        // guard explicitly in case upstream data is malformed.
+                        List<double[]> euclideanAAP = Transformations.toEuclideanPlane(aapGeoCoords, referenceLat, referenceLon);
+                        if (euclideanAAP.size() < 3) {
+                            Log.debug("Projected AAP has < 3 points at k=" + k + ", t=" + timeElapsed + "; skipping.");
+                            return;
+                        }
+
                         List<List<double[]>> polygonAndROI = Arrays.asList(
                                 euclideanROI.get(),
-                                Transformations.toEuclideanPlane(accessAreaPolygon.getGeoCoordinates(), referenceLat, referenceLon)
+                                euclideanAAP
                         );
                         Polygon intersection = polygonOperator.polyIntersect(polygonAndROI);
 
